@@ -1,0 +1,1741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Build Your Speculative AI Company</title>
+<style>
+/* ============================================================
+   DESIGN TOKENS
+   ============================================================ */
+:root {
+  --bg:       #0a0a0a;
+  --panel:    #0f0f0f;
+  --panel2:   #141414;
+  --border:   #1e1e1e;
+  --border2:  #2a2a2a;
+  --accent:   #00ff66;
+  --accent-d: #00cc52;
+  --glow:     rgba(0,255,102,0.12);
+  --amber:    #ffcc00;
+  --red:      #ff4444;
+  --text:     #e0e0e0;
+  --dim:      #555;
+  --muted:    #2e2e2e;
+  --font:     'Courier New', Courier, monospace;
+  --status-h: 44px;
+  --nav-h:    52px;
+}
+
+/* ============================================================
+   RESET + BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+/* ============================================================
+   LAYOUT SHELL
+   ============================================================ */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ============================================================
+   STATUS BAR
+   ============================================================ */
+#status-bar {
+  height: var(--status-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  gap: 16px;
+}
+
+#app-title {
+  font-size: 11px;
+  letter-spacing: 2.5px;
+  color: var(--accent);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+#progress-bar {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  flex: 1;
+  justify-content: center;
+}
+
+.prog-seg {
+  height: 4px;
+  width: 28px;
+  border-radius: 2px;
+  background: var(--muted);
+  transition: background 0.3s ease;
+}
+.prog-seg.active   { background: var(--accent); box-shadow: 0 0 6px var(--glow); }
+.prog-seg.complete { background: var(--dim); }
+
+#generate-btn {
+  font-family: var(--font);
+  font-size: 11px;
+  letter-spacing: 2px;
+  padding: 6px 14px;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+#generate-btn:hover { background: var(--glow); }
+
+/* ============================================================
+   STAGE CONTAINER
+   ============================================================ */
+#stage-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 12px 20px;
+}
+
+.stage-panel {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 700px;
+  gap: 20px;
+}
+.stage-panel.active { display: flex; }
+
+/* ============================================================
+   STAGE HEADER
+   ============================================================ */
+.stage-header {
+  text-align: center;
+  width: 100%;
+}
+
+.stage-num {
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+
+.stage-title {
+  font-size: 15px;
+  letter-spacing: 2px;
+  color: var(--text);
+  font-weight: normal;
+}
+
+/* ============================================================
+   HORIZONTAL SLIDER
+   ============================================================ */
+.slider-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  padding: 24px 8px 8px;
+  user-select: none;
+}
+
+.slider-labels-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  height: 16px;
+}
+
+.slider-label-item {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--dim);
+  text-align: center;
+  flex: 1;
+  transition: color 0.2s;
+  cursor: pointer;
+}
+.slider-label-item.active { color: var(--accent); }
+
+.slider-track-row {
+  position: relative;
+  height: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.slider-track {
+  position: relative;
+  width: 100%;
+  height: 2px;
+  background: var(--border2);
+  border-radius: 1px;
+}
+
+.slider-tick {
+  position: absolute;
+  top: -5px;
+  width: 1px;
+  height: 12px;
+  background: var(--border2);
+  transform: translateX(-50%);
+  transition: background 0.2s;
+}
+.slider-tick.active { background: var(--accent); }
+
+.slider-thumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 10px var(--glow);
+  cursor: grab;
+  transition: box-shadow 0.15s;
+  z-index: 2;
+}
+.slider-thumb:active { cursor: grabbing; box-shadow: 0 0 20px rgba(0,255,102,0.4); }
+
+/* ============================================================
+   LLM DISPLAY AREAS
+   ============================================================ */
+.llm-display {
+  width: 100%;
+  max-width: 520px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 16px;
+  min-height: 90px;
+  position: relative;
+}
+
+.llm-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--dim);
+  font-size: 11px;
+  letter-spacing: 1px;
+  position: absolute;
+  inset: 16px;
+}
+
+.ld { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+.ld { animation: ldot 1.2s ease-in-out infinite; }
+.ld:nth-child(2) { animation-delay: 0.2s; }
+.ld:nth-child(3) { animation-delay: 0.4s; }
+@keyframes ldot {
+  0%, 80%, 100% { transform: scale(0.5); opacity: 0.3; }
+  40%           { transform: scale(1.0); opacity: 1; }
+}
+
+.llm-content {
+  transition: opacity 0.2s ease;
+}
+.llm-content.fading { opacity: 0; }
+
+.fn-label {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: var(--dim);
+  margin-bottom: 4px;
+}
+
+.fn-text {
+  font-size: 13px;
+  color: var(--accent);
+  line-height: 1.55;
+  margin-bottom: 12px;
+}
+
+.ms-label {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: var(--dim);
+  margin-bottom: 4px;
+}
+
+.ms-text {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.6;
+  opacity: 0.75;
+  font-style: italic;
+}
+
+/* Company name display */
+.name-display {
+  font-size: 28px;
+  letter-spacing: 3px;
+  color: var(--accent);
+  text-align: center;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+  text-shadow: 0 0 20px var(--glow);
+}
+.name-display.fading { opacity: 0; }
+
+/* ============================================================
+   KNOB STAGE LAYOUT
+   ============================================================ */
+.knob-stage-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  width: 100%;
+  max-width: 620px;
+}
+
+.knob-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.knob-current-name {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  text-align: center;
+  min-height: 16px;
+}
+
+.knob-desc-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.knob-desc-box {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 14px;
+  min-height: 80px;
+  position: relative;
+}
+
+.knob-desc-text {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.65;
+  transition: opacity 0.15s ease;
+}
+.knob-desc-text.fading { opacity: 0; }
+
+/* Static desc for stages 5 & 6 */
+.static-desc {
+  width: 100%;
+  max-width: 520px;
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.65;
+  padding: 14px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  opacity: 0.85;
+}
+
+/* ============================================================
+   NAV BAR
+   ============================================================ */
+#nav-bar {
+  height: var(--nav-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.nav-btn {
+  font-family: var(--font);
+  font-size: 11px;
+  letter-spacing: 2px;
+  padding: 8px 20px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--dim);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.nav-btn:hover:not(:disabled) { color: var(--text); border-color: var(--dim); }
+.nav-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+
+#next-btn {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: bold;
+}
+#next-btn:hover { background: var(--glow); }
+
+/* ============================================================
+   OUTPUT STAGE (receipt)
+   ============================================================ */
+#stage-7 {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  overflow-y: auto;
+  padding: 20px;
+  gap: 16px;
+}
+
+.receipt-printer-wrap {
+  overflow: hidden;
+  max-height: calc(100vh - var(--status-h) - var(--nav-h) - 80px);
+  display: flex;
+  justify-content: center;
+}
+
+.receipt {
+  width: 320px;
+  background: #f5f0e8;
+  color: #1a1a1a;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  box-shadow: 0 8px 48px rgba(0,0,0,0.85), 0 2px 8px rgba(0,0,0,0.5);
+  transform: translateY(-110%);
+  transition: transform 0s; /* controlled via JS */
+}
+
+.receipt.printing {
+  transition: transform 1.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transform: translateY(0);
+}
+
+/* Torn-edge effect: dots at top and bottom */
+.receipt-edge {
+  height: 12px;
+  background:
+    radial-gradient(circle at 6px 0px, #0a0a0a 5.5px, #f5f0e8 5.5px) -1px 0 / 12px 12px;
+}
+.receipt-edge.bottom {
+  background:
+    radial-gradient(circle at 6px 12px, #0a0a0a 5.5px, #f5f0e8 5.5px) -1px 0 / 12px 12px;
+}
+
+.receipt-body {
+  padding: 8px 20px 16px;
+}
+
+.r-divider   { border: none; border-top: 1px dashed #b0a898; margin: 10px 0; }
+.r-divider-d { border: none; border-top: 1px solid #b0a898; margin: 10px 0; }
+.r-center    { text-align: center; }
+.r-bold      { font-weight: bold; }
+.r-small     { font-size: 10px; color: #666; }
+.r-mission   { font-style: italic; color: #333; line-height: 1.55; }
+.r-story     { color: #222; line-height: 1.6; }
+.r-risk      { color: #444; line-height: 1.55; }
+.r-label     { font-size: 10px; letter-spacing: 1px; color: #888; margin-bottom: 2px; }
+.r-value     { color: #111; margin-bottom: 6px; }
+.r-impact-row {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin: 8px 0;
+}
+.r-impact-item { text-align: center; }
+.r-impact-label { font-size: 9px; letter-spacing: 1px; color: #888; margin-top: 4px; }
+
+#start-over-btn {
+  font-family: var(--font);
+  font-size: 11px;
+  letter-spacing: 2px;
+  padding: 10px 24px;
+  background: transparent;
+  color: var(--dim);
+  border: 1px solid var(--border2);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+#start-over-btn:hover { color: var(--text); border-color: var(--dim); }
+
+/* ============================================================
+   GENERATING OVERLAY (for final generation)
+   ============================================================ */
+#gen-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(10,10,10,0.9);
+  z-index: 100;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+#gen-overlay.active { display: flex; }
+.gen-msg {
+  font-size: 12px;
+  letter-spacing: 3px;
+  color: var(--dim);
+}
+.gen-dots { display: flex; gap: 8px; }
+.gen-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  animation: ldot 1.2s ease-in-out infinite;
+}
+.gen-dot:nth-child(2) { animation-delay: 0.2s; }
+.gen-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* ============================================================
+   DIAL WRAPPER
+   ============================================================ */
+.dial-wrapper {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  flex-shrink: 0;
+}
+
+.dial-label {
+  position: absolute;
+  font-family: var(--font);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--dim);
+  max-width: 72px;
+  line-height: 1.25;
+  transform: translate(-50%, -50%);
+  transition: color 0.2s, text-shadow 0.2s;
+}
+.dial-label:hover { color: var(--text); }
+.dial-label.active {
+  color: var(--accent);
+  text-shadow: 0 0 8px var(--glow);
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 640px) {
+  #app-title { display: none; }
+  .knob-stage-layout { flex-direction: column; align-items: center; }
+  .dial-wrapper { width: 160px; height: 160px; }
+  .receipt { width: 290px; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- STATUS BAR -->
+  <div id="status-bar">
+    <div id="app-title">BUILD YOUR SPECULATIVE AI COMPANY</div>
+    <div id="progress-bar"></div>
+    <button id="generate-btn">[ GENERATE ]</button>
+  </div>
+
+  <!-- STAGE CONTAINER -->
+  <div id="stage-container">
+
+    <!-- STAGE 0: COMPANY FUNCTION -->
+    <div id="stage-0" class="stage-panel">
+      <div class="stage-header">
+        <div class="stage-num">01 / 07</div>
+        <div class="stage-title">WHAT DOES YOUR COMPANY DO?</div>
+      </div>
+      <div class="slider-wrap" id="s0-wrap"></div>
+      <div class="llm-display" id="s0-display">
+        <div class="llm-loading" id="s0-loading">
+          <div class="ld"></div><div class="ld"></div><div class="ld"></div>
+          <span>generating&hellip;</span>
+        </div>
+        <div class="llm-content" id="s0-content">
+          <div class="fn-label">FUNCTION</div>
+          <div class="fn-text" id="s0-fn">Move the slider to generate a company concept.</div>
+          <div class="ms-label">MISSION</div>
+          <div class="ms-text" id="s0-ms"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAGE 1: COMPANY NAME -->
+    <div id="stage-1" class="stage-panel">
+      <div class="stage-header">
+        <div class="stage-num">02 / 07</div>
+        <div class="stage-title">NAME YOUR COMPANY</div>
+      </div>
+      <div class="slider-wrap" id="s1-wrap"></div>
+      <div class="llm-display" id="s1-display">
+        <div class="llm-loading" id="s1-loading">
+          <div class="ld"></div><div class="ld"></div><div class="ld"></div>
+          <span>generating&hellip;</span>
+        </div>
+        <div class="name-display" id="s1-name">—</div>
+      </div>
+    </div>
+
+    <!-- STAGE 2: BUSINESS MODEL -->
+    <div id="stage-2" class="stage-panel">
+      <div class="stage-header">
+        <div class="stage-num">03 / 07</div>
+        <div class="stage-title">HOW IS IT FUNDED?</div>
+      </div>
+      <div class="knob-stage-layout">
+        <div class="knob-col">
+          <div class="dial-wrapper" id="k2-wrap"></div>
+          <div class="knob-current-name" id="k2-name">GOVT GRANTS</div>
+        </div>
+        <div class="knob-desc-col">
+          <div class="knob-desc-box">
+            <div class="llm-loading" id="k2-loading">
+              <div class="ld"></div><div class="ld"></div><div class="ld"></div>
+              <span>generating descriptions&hellip;</span>
+            </div>
+            <div class="knob-desc-text" id="k2-desc"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAGE 3: DATA TYPE -->
+    <div id="stage-3" class="stage-panel">
+      <div class="stage-header">
+        <div class="stage-num">04 / 07</div>
+        <div class="stage-title">WHAT DATA DOES IT LEARN FROM?</div>
+      </div>
+      <div class="knob-stage-layout">
+        <div class="knob-col">
+          <div class="dial-wrapper" id="k3-wrap"></div>
+          <div class="knob-current-name" id="k3-name">GENERAL WEB</div>
+        </div>
+        <div class="knob-desc-col">
+          <div class="knob-desc-box">
+            <div class="llm-loading" id="k3-loading">
+              <div class="ld"></div><div class="ld"></div><div class="ld"></div>
+              <span>generating descriptions&hellip;</span>
+            </div>
+            <div class="knob-desc-text" id="k3-desc"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAGE 4: DATA ACQUISITION -->
+    <div id="stage-4" class="stage-panel">
+      <div class="stage-header">
+        <div class="stage-num">05 / 07</div>
+        <div class="stage-title">HOW WAS THE DATA OBTAINED?</div>
+      </div>
+      <div class="knob-stage-layout">
+        <div class="knob-col">
+          <div class="dial-wrapper" id="k4-wrap"></div>
+          <div class="knob-current-name" id="k4-name">SCRAPED</div>
+        </div>
+        <div class="knob-desc-col">
+          <div class="knob-desc-box">
+            <div class="llm-loading" id="k4-loading">
+              <div class="ld"></div><div class="ld"></div><div class="ld"></div>
+              <span>generating descriptions&hellip;</span>
+            </div>
+            <div class="knob-desc-text" id="k4-desc"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAGE 5: MODEL SIZE -->
+    <div id="stage-5" class="stage-panel">
+      <div class="stage-header">
+        <div class="stage-num">06 / 07</div>
+        <div class="stage-title">HOW LARGE IS THE MODEL?</div>
+      </div>
+      <div class="slider-wrap" id="s5-wrap"></div>
+      <div class="static-desc" id="s5-desc"></div>
+    </div>
+
+    <!-- STAGE 6: HOSTING -->
+    <div id="stage-6" class="stage-panel">
+      <div class="stage-header">
+        <div class="stage-num">07 / 07</div>
+        <div class="stage-title">WHERE DOES IT RUN?</div>
+      </div>
+      <div class="knob-stage-layout">
+        <div class="knob-col">
+          <div class="dial-wrapper" id="k6-wrap"></div>
+          <div class="knob-current-name" id="k6-name">CLOUD</div>
+        </div>
+        <div class="knob-desc-col">
+          <div class="static-desc" id="k6-desc" style="margin-top:0;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAGE 7: RECEIPT OUTPUT -->
+    <div id="stage-7" class="stage-panel">
+      <div class="receipt-printer-wrap" id="receipt-printer-wrap">
+        <div class="receipt" id="receipt">
+          <div class="receipt-edge"></div>
+          <div class="receipt-body" id="receipt-body"></div>
+          <div class="receipt-edge bottom"></div>
+        </div>
+      </div>
+      <button id="start-over-btn">↩ START OVER</button>
+    </div>
+
+  </div><!-- /stage-container -->
+
+  <!-- NAV BAR -->
+  <div id="nav-bar">
+    <button class="nav-btn" id="back-btn">← BACK</button>
+    <button class="nav-btn" id="next-btn">NEXT →</button>
+  </div>
+
+</div><!-- /app -->
+
+<!-- Generating overlay -->
+<div id="gen-overlay">
+  <div class="gen-dots">
+    <div class="gen-dot"></div><div class="gen-dot"></div><div class="gen-dot"></div>
+  </div>
+  <div class="gen-msg">GENERATING ANALYSIS</div>
+</div>
+
+<script>
+/* ============================================================
+   ROTARY DIAL CLASS (adapted from dial.js — colour: #00ff66)
+   ============================================================ */
+class RotaryDial {
+  constructor({ container, optionIds, optionNames, onChange, size = 200 }) {
+    this.container   = container;
+    this.optionIds   = optionIds;
+    this.optionNames = optionNames;
+    this.onChange    = onChange;
+    this.size        = size;
+    this.n           = optionIds.length;
+    this.currentAngle = 0;
+    this.targetAngle  = 0;
+    this.currentIndex = 0;
+    this.isDragging   = false;
+    this.dragStartAngle = 0;
+    this.dragStartMouseAngle = 0;
+    this._rafId = null;
+    this._animate = this._animate.bind(this);
+    this._build();
+    this._bindEvents();
+    this._snapTo(0, false);
+  }
+
+  _build() {
+    const s = this.size, cx = s / 2, cy = s / 2;
+    const R = s / 2 - 4, knobR = R * 0.52;
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('width', s); svg.setAttribute('height', s);
+    svg.setAttribute('viewBox', `0 0 ${s} ${s}`);
+    svg.style.cursor = 'grab';
+    svg.style.userSelect = 'none';
+
+    const defs = document.createElementNS(ns, 'defs');
+    const kg = document.createElementNS(ns, 'radialGradient');
+    kg.id = `kg-${Math.random().toString(36).slice(2)}`;
+    kg.setAttribute('cx','40%'); kg.setAttribute('cy','35%');
+    [['0%','#2a2a2a'],['60%','#151515'],['100%','#0a0a0a']].forEach(([o,c]) => {
+      const s2 = document.createElementNS(ns, 'stop');
+      s2.setAttribute('offset', o); s2.setAttribute('stop-color', c);
+      kg.appendChild(s2);
+    });
+    const bg = document.createElementNS(ns, 'radialGradient');
+    bg.id = `bg-${Math.random().toString(36).slice(2)}`;
+    bg.setAttribute('cx','50%'); bg.setAttribute('cy','50%');
+    [['0%','#1e1e1e'],['100%','#0d0d0d']].forEach(([o,c]) => {
+      const s2 = document.createElementNS(ns, 'stop');
+      s2.setAttribute('offset', o); s2.setAttribute('stop-color', c);
+      bg.appendChild(s2);
+    });
+    defs.appendChild(kg); defs.appendChild(bg);
+
+    const filt = document.createElementNS(ns, 'filter');
+    filt.id = `gf-${Math.random().toString(36).slice(2)}`;
+    filt.setAttribute('x','-50%'); filt.setAttribute('y','-50%');
+    filt.setAttribute('width','200%'); filt.setAttribute('height','200%');
+    const feg = document.createElementNS(ns, 'feGaussianBlur');
+    feg.setAttribute('stdDeviation','2.5'); feg.setAttribute('result','blur');
+    const fem = document.createElementNS(ns, 'feMerge');
+    const fn1 = document.createElementNS(ns, 'feMergeNode'); fn1.setAttribute('in','blur');
+    const fn2 = document.createElementNS(ns, 'feMergeNode'); fn2.setAttribute('in','SourceGraphic');
+    fem.appendChild(fn1); fem.appendChild(fn2);
+    filt.appendChild(feg); filt.appendChild(fem);
+    defs.appendChild(filt);
+    svg.appendChild(defs);
+
+    // Bezel
+    const bezel = document.createElementNS(ns, 'circle');
+    bezel.setAttribute('cx', cx); bezel.setAttribute('cy', cy); bezel.setAttribute('r', R);
+    bezel.setAttribute('fill', `url(#${bg.id})`);
+    bezel.setAttribute('stroke', '#222'); bezel.setAttribute('stroke-width', '1.5');
+    svg.appendChild(bezel);
+
+    // Ticks
+    for (let i = 0; i < this.n; i++) {
+      const a = this._optionAngle(i);
+      const t = document.createElementNS(ns, 'line');
+      t.setAttribute('x1', cx + Math.sin(a) * (R - 5));
+      t.setAttribute('y1', cy - Math.cos(a) * (R - 5));
+      t.setAttribute('x2', cx + Math.sin(a) * (R - 14));
+      t.setAttribute('y2', cy - Math.cos(a) * (R - 14));
+      t.setAttribute('stroke', '#333'); t.setAttribute('stroke-width', '1.5');
+      t.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(t);
+    }
+
+    // Knob group
+    const grp = document.createElementNS(ns, 'g');
+    const knob = document.createElementNS(ns, 'circle');
+    knob.setAttribute('cx', cx); knob.setAttribute('cy', cy); knob.setAttribute('r', knobR);
+    knob.setAttribute('fill', `url(#${kg.id})`);
+    knob.setAttribute('stroke', '#2a2a2a'); knob.setAttribute('stroke-width', '1');
+    grp.appendChild(knob);
+
+    const indLen = knobR * 0.72;
+    const ind = document.createElementNS(ns, 'line');
+    ind.setAttribute('x1', cx); ind.setAttribute('y1', cy);
+    ind.setAttribute('x2', cx); ind.setAttribute('y2', cy - indLen);
+    ind.setAttribute('stroke', '#00ff66'); ind.setAttribute('stroke-width', '2.5');
+    ind.setAttribute('stroke-linecap', 'round');
+    grp.appendChild(ind);
+
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('cx', cx); dot.setAttribute('cy', cy - indLen * 0.84);
+    dot.setAttribute('r', '3'); dot.setAttribute('fill', '#00ff66');
+    dot.setAttribute('filter', `url(#${filt.id})`);
+    grp.appendChild(dot);
+
+    svg.appendChild(grp);
+    this.knobGroup = grp;
+
+    // Centre cap
+    const cap = document.createElementNS(ns, 'circle');
+    cap.setAttribute('cx', cx); cap.setAttribute('cy', cy); cap.setAttribute('r', '11');
+    cap.setAttribute('fill', '#0d0d0d'); cap.setAttribute('stroke', '#2a2a2a');
+    cap.setAttribute('stroke-width', '1');
+    svg.appendChild(cap);
+
+    this.svg = svg; this.cx = cx; this.cy = cy; this.R = R;
+    this.container.appendChild(svg);
+    this._buildLabels();
+  }
+
+  _buildLabels() {
+    this.container.querySelectorAll('.dial-label').forEach(e => e.remove());
+    const labelR = this.R + 26;
+    this.labelEls = this.optionNames.map((name, i) => {
+      const a = this._optionAngle(i);
+      const x = this.cx + Math.sin(a) * labelR;
+      const y = this.cy - Math.cos(a) * labelR;
+      const el = document.createElement('div');
+      el.className = 'dial-label';
+      el.dataset.index = i;
+      el.style.left = `${x}px`;
+      el.style.top  = `${y}px`;
+      el.textContent = name;
+      el.addEventListener('click', () => this._snapTo(i, true));
+      this.container.appendChild(el);
+      return el;
+    });
+  }
+
+  _bindEvents() {
+    this.svg.addEventListener('mousedown', e => this._onDragStart(e));
+    window.addEventListener('mousemove', e => this._onDragMove(e));
+    window.addEventListener('mouseup',   e => this._onDragEnd(e));
+    this.svg.addEventListener('touchstart', e => this._onDragStart(e.touches[0]), { passive: true });
+    window.addEventListener('touchmove', e => { if (this.isDragging) { e.preventDefault(); this._onDragMove(e.touches[0]); } }, { passive: false });
+    window.addEventListener('touchend',  e => this._onDragEnd(e));
+  }
+
+  _getMouseAngle(e) {
+    const r = this.svg.getBoundingClientRect();
+    return Math.atan2(e.clientX - r.left - this.cx, -(e.clientY - r.top - this.cy));
+  }
+
+  _onDragStart(e) {
+    this.isDragging = true;
+    this.dragStartAngle = this.currentAngle;
+    this.dragStartMouseAngle = this._getMouseAngle(e);
+  }
+
+  _onDragMove(e) {
+    if (!this.isDragging) return;
+    let d = this._getMouseAngle(e) - this.dragStartMouseAngle;
+    while (d >  Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    this.currentAngle = this.dragStartAngle + d;
+    this._applyRotation(this.currentAngle);
+    const ni = this._nearestIndex(this.currentAngle);
+    if (ni !== this.currentIndex) {
+      this.currentIndex = ni;
+      this._updateLabels();
+      this.onChange(ni);
+    }
+  }
+
+  _onDragEnd() {
+    if (!this.isDragging) return;
+    this.isDragging = false;
+    this._snapTo(this._nearestIndex(this.currentAngle), true);
+  }
+
+  _optionAngle(i) { return -0.45 + (2 * Math.PI / this.n) * i; }
+
+  _nearestIndex(angle) {
+    let best = 0, bestDist = Infinity;
+    for (let i = 0; i < this.n; i++) {
+      let d = angle - this._optionAngle(i);
+      while (d >  Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      if (Math.abs(d) < bestDist) { bestDist = Math.abs(d); best = i; }
+    }
+    return best;
+  }
+
+  _snapTo(index, animate) {
+    this.currentIndex = index;
+    this.targetAngle  = this._optionAngle(index);
+    if (!animate) {
+      this.currentAngle = this.targetAngle;
+      this._applyRotation(this.currentAngle);
+    } else {
+      if (this._rafId) cancelAnimationFrame(this._rafId);
+      this._rafId = requestAnimationFrame(this._animate);
+    }
+    this._updateLabels();
+    this.onChange(index);
+  }
+
+  _animate() {
+    let d = this.targetAngle - this.currentAngle;
+    while (d >  Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    if (Math.abs(d) < 0.001) {
+      this.currentAngle = this.targetAngle;
+      this._applyRotation(this.currentAngle);
+      this._rafId = null; return;
+    }
+    this.currentAngle += d * 0.18;
+    this._applyRotation(this.currentAngle);
+    this._rafId = requestAnimationFrame(this._animate);
+  }
+
+  _applyRotation(angle) {
+    this.knobGroup.setAttribute('transform',
+      `rotate(${(angle * 180) / Math.PI}, ${this.cx}, ${this.cy})`);
+  }
+
+  _updateLabels() {
+    if (!this.labelEls) return;
+    this.labelEls.forEach((el, i) => el.classList.toggle('active', i === this.currentIndex));
+  }
+
+  getCurrentIndex() { return this.currentIndex; }
+}
+
+/* ============================================================
+   HORIZONTAL SLIDER CLASS
+   ============================================================ */
+class HorizontalSlider {
+  constructor({ container, positions, showLabels, labels, onChange }) {
+    this.container  = container;
+    this.positions  = positions;
+    this.showLabels = showLabels;
+    this.labels     = labels || [];
+    this.onChange   = onChange;
+    this.currentIndex = Math.floor(positions / 2);
+    this.targetPct    = this._indexToPct(this.currentIndex);
+    this.currentPct   = this.targetPct;
+    this._rafId = null;
+    this._dragging = false;
+    this._animate = this._animate.bind(this);
+    this._build();
+    this._bindEvents();
+    this._setThumb(this.currentPct, false);
+  }
+
+  _indexToPct(i) { return i / (this.positions - 1); }
+
+  _build() {
+    this.container.innerHTML = '';
+
+    // Labels row (always create, hide if not showLabels)
+    const labRow = document.createElement('div');
+    labRow.className = 'slider-labels-row';
+    this.labelEls = [];
+    for (let i = 0; i < this.positions; i++) {
+      const el = document.createElement('div');
+      el.className = 'slider-label-item';
+      el.textContent = this.showLabels ? (this.labels[i] || '') : '';
+      el.dataset.index = i;
+      if (this.showLabels) {
+        el.addEventListener('click', () => this._snapTo(i));
+      }
+      labRow.appendChild(el);
+      this.labelEls.push(el);
+    }
+    if (this.showLabels) this.container.appendChild(labRow);
+
+    // Track row
+    const trackRow = document.createElement('div');
+    trackRow.className = 'slider-track-row';
+    const track = document.createElement('div');
+    track.className = 'slider-track';
+
+    // Ticks
+    this.tickEls = [];
+    for (let i = 0; i < this.positions; i++) {
+      const tick = document.createElement('div');
+      tick.className = 'slider-tick';
+      tick.style.left = `${this._indexToPct(i) * 100}%`;
+      track.appendChild(tick);
+      this.tickEls.push(tick);
+    }
+
+    // Thumb
+    this.thumb = document.createElement('div');
+    this.thumb.className = 'slider-thumb';
+    track.appendChild(this.thumb);
+
+    trackRow.appendChild(track);
+    this.container.appendChild(trackRow);
+    this.track = track;
+  }
+
+  _bindEvents() {
+    this.thumb.addEventListener('mousedown', e => { e.preventDefault(); this._dragging = true; });
+    this.track.addEventListener('click', e => {
+      if (this._dragging) return;
+      this._snapTo(this._xToIndex(e.clientX));
+    });
+    window.addEventListener('mousemove', e => {
+      if (!this._dragging) return;
+      const i = this._xToIndex(e.clientX);
+      if (i !== this.currentIndex) {
+        this.currentIndex = i;
+        this._updateActive();
+        this.onChange(i);
+      }
+      this.targetPct = this._indexToPct(i);
+      if (!this._rafId) this._rafId = requestAnimationFrame(this._animate);
+    });
+    window.addEventListener('mouseup', () => {
+      if (!this._dragging) return;
+      this._dragging = false;
+      this._snapTo(this.currentIndex);
+    });
+    // Touch
+    this.thumb.addEventListener('touchstart', e => { e.preventDefault(); this._dragging = true; }, { passive: false });
+    window.addEventListener('touchmove', e => {
+      if (!this._dragging) return;
+      const i = this._xToIndex(e.touches[0].clientX);
+      if (i !== this.currentIndex) { this.currentIndex = i; this._updateActive(); this.onChange(i); }
+      this.targetPct = this._indexToPct(i);
+      if (!this._rafId) this._rafId = requestAnimationFrame(this._animate);
+    }, { passive: true });
+    window.addEventListener('touchend', () => { if (this._dragging) { this._dragging = false; this._snapTo(this.currentIndex); } });
+  }
+
+  _xToIndex(clientX) {
+    const rect = this.track.getBoundingClientRect();
+    const pct  = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return Math.round(pct * (this.positions - 1));
+  }
+
+  _snapTo(index) {
+    this.currentIndex = index;
+    this.targetPct    = this._indexToPct(index);
+    this._updateActive();
+    this.onChange(index);
+    if (!this._rafId) this._rafId = requestAnimationFrame(this._animate);
+  }
+
+  _animate() {
+    const diff = this.targetPct - this.currentPct;
+    if (Math.abs(diff) < 0.001) {
+      this.currentPct = this.targetPct;
+      this._setThumb(this.currentPct, false);
+      this._rafId = null; return;
+    }
+    this.currentPct += diff * 0.2;
+    this._setThumb(this.currentPct, false);
+    this._rafId = requestAnimationFrame(this._animate);
+  }
+
+  _setThumb(pct) {
+    this.thumb.style.left = `${pct * 100}%`;
+  }
+
+  _updateActive() {
+    this.tickEls.forEach((t, i) => t.classList.toggle('active', i === this.currentIndex));
+    if (this.showLabels) {
+      this.labelEls.forEach((l, i) => l.classList.toggle('active', i === this.currentIndex));
+    }
+  }
+
+  getCurrentIndex() { return this.currentIndex; }
+}
+
+/* ============================================================
+   STATIC DATA
+   ============================================================ */
+const MODEL_SIZES = ['1B', '3B', '7B', '14B', '32B'];
+
+const MODEL_SIZE_DESCS = {
+  '1B':  'Runs on a laptop or basic GPU. Fast inference, very low energy. Good for simple classification or extraction tasks. Will hallucinate on complex reasoning and struggle with nuance. Accessible — individuals and small orgs can run it locally.',
+  '3B':  'Consumer GPU territory (~8GB VRAM). Good balance for focused, well-defined tasks. Reasonable energy use. Still feasible for smaller organisations. Not powerful enough for open-ended reasoning or long-context work.',
+  '7B':  'Needs a decent GPU (16–24GB VRAM). Solid general capability — handles most language tasks competently. Moderate energy and infrastructure cost. The current sweet spot for many real-world deployments.',
+  '14B': 'Requires a high-end consumer GPU or small server. Noticeably more capable than 7B but operational costs rise. High energy use per query at scale. Starting to concentrate accessibility toward well-resourced organisations.',
+  '32B': 'Data-centre scale — multi-GPU server required. State-of-the-art reasoning and instruction following. Enormous energy footprint; significant compute cost per query. Only major corporations or well-funded labs can run this affordably at scale.',
+};
+
+const HOSTING_OPTS = ['CLOUD', 'ON-PREMISE', 'EDGE', 'DECENTRALISED'];
+const HOSTING_DESCS = {
+  'CLOUD':         'Runs on AWS, Azure, or Google Cloud. Scalable and reliable with managed infrastructure, but your data flows through Big Tech servers. Subject to their terms, pricing changes, and government data requests. Contributes to tech monopoly concentration.',
+  'ON-PREMISE':    'Company owns and operates the servers. Full control over data and compliance — nothing leaves the building. Expensive to maintain and scale. Energy use is the company\'s direct responsibility. Requires significant internal technical expertise.',
+  'EDGE':          'Runs on user devices — phones, laptops, local hardware. Maximum privacy: data never leaves the device. Limited by hardware constraints, so only smaller models are viable. Creates a digital divide: only users with capable devices can access it.',
+  'DECENTRALISED': 'Distributed across many independently-operated nodes — resilient to censorship or single-point failure. Coordination is difficult, quality control is hard, and governance is an unsolved problem. Novel and experimental. Who moderates what no one owns?',
+};
+
+const BM_OPTS  = ['GOVT GRANTS', 'PAY TO PLAY', 'BIG LOAN', 'RICH DONOR'];
+const BM_KEYS  = ['GOVT_GRANTS', 'PAY_TO_PLAY', 'BIG_LOAN', 'RICH_DONOR'];
+const DT_OPTS  = ['GENERAL WEB', 'BOOKS &\nACADEMIC', 'PROPRIETARY\nCLIENT', 'SOCIAL\nMEDIA'];
+const DT_KEYS  = ['GENERAL_WEB', 'BOOKS_ACADEMIC', 'PROPRIETARY_CLIENT', 'SOCIAL_MEDIA'];
+const DA_OPTS  = ['SCRAPED', 'LICENSED', 'CROWDSOURCED', 'SYNTHETIC'];
+const DA_KEYS  = ['SCRAPED', 'LICENSED', 'CROWDSOURCED', 'SYNTHETIC'];
+
+/* ============================================================
+   APP STATE
+   ============================================================ */
+const state = {
+  stage: 0,
+  companyFunction:   '',
+  missionStatement:  '',
+  companyName:       '',
+  bmIndex:  0,
+  dtIndex:  0,
+  daIndex:  0,
+  sizeIndex: 2,
+  hostIndex: 0,
+  bmDescs:  null,
+  dtDescs:  null,
+  daDescs:  null,
+  generatedNames: [],
+  abortController: null,
+};
+
+const stageInited = new Set();
+
+/* ============================================================
+   STREAMING HELPER
+   ============================================================ */
+async function streamLLM(endpoint, payload, onChunk, signal) {
+  const resp = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const reader = resp.body.getReader();
+  const dec    = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    onChunk(buf);
+  }
+  return buf;
+}
+
+function abortCurrent() {
+  if (state.abortController) {
+    try { state.abortController.abort(); } catch (_) {}
+  }
+  state.abortController = new AbortController();
+  return state.abortController.signal;
+}
+
+/* ============================================================
+   PARSE HELPERS
+   ============================================================ */
+function parseKeyedText(text, keys) {
+  const result = {};
+  keys.forEach((key, i) => {
+    const nextKey = keys[i + 1];
+    const pat = nextKey
+      ? new RegExp(`${key}:\\s*([\\s\\S]*?)(?=\\s*${nextKey}:)`, 'i')
+      : new RegExp(`${key}:\\s*([\\s\\S]*)`, 'i');
+    const m = text.match(pat);
+    result[key] = m ? m[1].trim() : '—';
+  });
+  return result;
+}
+
+function parseFinal(text) {
+  const story    = (text.match(/STORY:\s*([\s\S]*?)(?=\s*SOCIETAL_IMPACT:)/i) || [])[1] || '';
+  const societal = parseInt((text.match(/SOCIETAL_IMPACT:\s*(\d+)/i) || [])[1]) || 5;
+  const env      = parseInt((text.match(/ENVIRONMENTAL_IMPACT:\s*(\d+)/i) || [])[1]) || 5;
+  const failure  = (text.match(/FAILURE_NOTE:\s*([\s\S]*)$/i) || [])[1] || '';
+  return {
+    story:     story.trim(),
+    societal:  Math.max(1, Math.min(10, societal)),
+    env:       Math.max(1, Math.min(10, env)),
+    failure:   failure.trim(),
+  };
+}
+
+/* ============================================================
+   STAGE 0: COMPANY FUNCTION
+   ============================================================ */
+let s0Timer = null;
+
+function initStage0() {
+  const wrap = document.getElementById('s0-wrap');
+  new HorizontalSlider({
+    container: wrap,
+    positions: 7,
+    showLabels: false,
+    onChange: (i) => {
+      clearTimeout(s0Timer);
+      s0Timer = setTimeout(() => triggerFunction(i + 1), 300);
+    },
+  });
+  // Trigger initial generation
+  triggerFunction(4);
+}
+
+async function triggerFunction(position) {
+  const signal = abortCurrent();
+  const loading = document.getElementById('s0-loading');
+  const content = document.getElementById('s0-content');
+  const fnEl    = document.getElementById('s0-fn');
+  const msEl    = document.getElementById('s0-ms');
+
+  loading.style.display = 'flex';
+  content.classList.add('fading');
+
+  try {
+    let buf = '';
+    await streamLLM('/api/company-function', { position }, (chunk) => {
+      buf = chunk;
+      // Parse and update live
+      const fnMatch = buf.match(/FUNCTION:\s*(.+?)(?=\nMISSION:|$)/si);
+      const msMatch = buf.match(/MISSION:\s*([\s\S]*)/i);
+      if (fnMatch) fnEl.textContent = fnMatch[1].trim();
+      if (msMatch) msEl.textContent = msMatch[1].trim();
+    }, signal);
+
+    // Final parse
+    const fnMatch = buf.match(/FUNCTION:\s*(.+?)(?=\nMISSION:|$)/si);
+    const msMatch = buf.match(/MISSION:\s*([\s\S]*)/i);
+    state.companyFunction  = fnMatch ? fnMatch[1].trim() : buf.trim();
+    state.missionStatement = msMatch ? msMatch[1].trim() : '';
+
+    // Reset name cache when function changes
+    state.bmDescs = null; state.dtDescs = null; state.daDescs = null;
+
+    loading.style.display = 'none';
+    content.classList.remove('fading');
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      loading.style.display = 'none';
+      content.classList.remove('fading');
+    }
+  }
+}
+
+/* ============================================================
+   STAGE 1: COMPANY NAME
+   ============================================================ */
+let s1Timer = null;
+
+function initStage1() {
+  const wrap = document.getElementById('s1-wrap');
+  new HorizontalSlider({
+    container: wrap,
+    positions: 7,
+    showLabels: false,
+    onChange: (i) => {
+      clearTimeout(s1Timer);
+      s1Timer = setTimeout(() => triggerName(), 300);
+    },
+  });
+  triggerName();
+}
+
+async function triggerName() {
+  const signal  = abortCurrent();
+  const loading = document.getElementById('s1-loading');
+  const nameEl  = document.getElementById('s1-name');
+
+  loading.style.display = 'flex';
+  nameEl.classList.add('fading');
+
+  try {
+    let buf = '';
+    await streamLLM('/api/company-name', {
+      company_function: state.companyFunction || 'an AI company',
+      previous_names: state.generatedNames.slice(-6),
+    }, (chunk) => {
+      buf = chunk;
+      nameEl.textContent = buf.trim().split('\n')[0].trim() || '—';
+    }, signal);
+
+    const finalName = buf.trim().split('\n')[0].trim();
+    state.companyName = finalName || 'Unnamed Corp';
+    if (finalName && !state.generatedNames.includes(finalName)) {
+      state.generatedNames.push(finalName);
+    }
+    loading.style.display = 'none';
+    nameEl.classList.remove('fading');
+    nameEl.textContent = state.companyName;
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      loading.style.display = 'none';
+      nameEl.classList.remove('fading');
+    }
+  }
+}
+
+/* ============================================================
+   KNOB STAGE HELPERS (stages 2, 3, 4)
+   ============================================================ */
+async function loadDescs(stage, keys, descKey, loadingId, descId, currentIndex) {
+  const loading = document.getElementById(loadingId);
+  const descEl  = document.getElementById(descId);
+
+  if (state[descKey]) {
+    updateKnobDesc(descEl, state[descKey][keys[currentIndex]] || '—');
+    return;
+  }
+
+  loading.style.display = 'flex';
+  descEl.style.display  = 'none';
+
+  const dtLabel = DT_OPTS[state.dtIndex] || 'general';
+
+  try {
+    let buf = '';
+    await streamLLM('/api/describe', {
+      company_name:     state.companyName     || 'the company',
+      company_function: state.companyFunction || 'an AI service',
+      stage,
+      data_type: stage === 'data_acquisition' ? dtLabel : undefined,
+    }, (chunk) => { buf = chunk; }, null);
+
+    state[descKey] = parseKeyedText(buf, keys);
+    loading.style.display = 'none';
+    descEl.style.display  = '';
+    updateKnobDesc(descEl, state[descKey][keys[currentIndex]] || '—');
+  } catch (e) {
+    loading.style.display = 'none';
+    descEl.style.display  = '';
+    descEl.textContent = 'Could not generate description.';
+  }
+}
+
+function updateKnobDesc(el, text) {
+  el.classList.add('fading');
+  setTimeout(() => {
+    el.textContent = text;
+    el.classList.remove('fading');
+  }, 150);
+}
+
+/* ============================================================
+   STAGE 2: BUSINESS MODEL
+   ============================================================ */
+function initStage2() {
+  const wrap = document.getElementById('k2-wrap');
+  new RotaryDial({
+    container:   wrap,
+    optionIds:   BM_KEYS,
+    optionNames: BM_OPTS,
+    size: 200,
+    onChange: (i) => {
+      state.bmIndex = i;
+      document.getElementById('k2-name').textContent = BM_OPTS[i];
+      if (state.bmDescs) {
+        updateKnobDesc(document.getElementById('k2-desc'), state.bmDescs[BM_KEYS[i]] || '—');
+      }
+    },
+  });
+  loadDescs('business_model', BM_KEYS, 'bmDescs', 'k2-loading', 'k2-desc', state.bmIndex);
+}
+
+/* ============================================================
+   STAGE 3: DATA TYPE
+   ============================================================ */
+function initStage3() {
+  const wrap = document.getElementById('k3-wrap');
+  const displayNames = ['GENERAL\nWEB', 'BOOKS /\nACADEMIC', 'PROPRIETARY\nCLIENT', 'SOCIAL\nMEDIA'];
+  new RotaryDial({
+    container:   wrap,
+    optionIds:   DT_KEYS,
+    optionNames: displayNames,
+    size: 200,
+    onChange: (i) => {
+      state.dtIndex = i;
+      document.getElementById('k3-name').textContent = DT_OPTS[i].replace('\n', ' ');
+      if (state.dtDescs) {
+        updateKnobDesc(document.getElementById('k3-desc'), state.dtDescs[DT_KEYS[i]] || '—');
+      }
+    },
+  });
+  loadDescs('data_type', DT_KEYS, 'dtDescs', 'k3-loading', 'k3-desc', state.dtIndex);
+}
+
+/* ============================================================
+   STAGE 4: DATA ACQUISITION
+   ============================================================ */
+function initStage4() {
+  const wrap = document.getElementById('k4-wrap');
+  new RotaryDial({
+    container:   wrap,
+    optionIds:   DA_KEYS,
+    optionNames: DA_OPTS,
+    size: 200,
+    onChange: (i) => {
+      state.daIndex = i;
+      document.getElementById('k4-name').textContent = DA_OPTS[i];
+      if (state.daDescs) {
+        updateKnobDesc(document.getElementById('k4-desc'), state.daDescs[DA_KEYS[i]] || '—');
+      }
+    },
+  });
+  loadDescs('data_acquisition', DA_KEYS, 'daDescs', 'k4-loading', 'k4-desc', state.daIndex);
+}
+
+/* ============================================================
+   STAGE 5: MODEL SIZE
+   ============================================================ */
+function initStage5() {
+  const wrap = document.getElementById('s5-wrap');
+  const descEl = document.getElementById('s5-desc');
+
+  new HorizontalSlider({
+    container:  wrap,
+    positions:  5,
+    showLabels: true,
+    labels:     MODEL_SIZES,
+    onChange: (i) => {
+      state.sizeIndex = i;
+      descEl.textContent = MODEL_SIZE_DESCS[MODEL_SIZES[i]];
+    },
+  });
+  descEl.textContent = MODEL_SIZE_DESCS[MODEL_SIZES[state.sizeIndex]];
+}
+
+/* ============================================================
+   STAGE 6: HOSTING
+   ============================================================ */
+function initStage6() {
+  const wrap   = document.getElementById('k6-wrap');
+  const descEl = document.getElementById('k6-desc');
+  new RotaryDial({
+    container:   wrap,
+    optionIds:   HOSTING_OPTS,
+    optionNames: HOSTING_OPTS,
+    size: 200,
+    onChange: (i) => {
+      state.hostIndex = i;
+      document.getElementById('k6-name').textContent = HOSTING_OPTS[i];
+      descEl.textContent = HOSTING_DESCS[HOSTING_OPTS[i]];
+    },
+  });
+  descEl.textContent = HOSTING_DESCS[HOSTING_OPTS[state.hostIndex]];
+}
+
+/* ============================================================
+   GENERATE FINAL
+   ============================================================ */
+async function generateFinal() {
+  const overlay = document.getElementById('gen-overlay');
+  overlay.classList.add('active');
+
+  try {
+    let buf = '';
+    await streamLLM('/api/generate', {
+      company_name:     state.companyName     || 'Unnamed Corp',
+      company_function: state.companyFunction || 'an AI company',
+      mission_statement: state.missionStatement || '',
+      business_model:   BM_OPTS[state.bmIndex],
+      data_type:        DT_OPTS[state.dtIndex].replace('\n', ' '),
+      data_acquisition: DA_OPTS[state.daIndex],
+      model_size:       MODEL_SIZES[state.sizeIndex],
+      hosting:          HOSTING_OPTS[state.hostIndex],
+    }, (chunk) => { buf = chunk; }, null);
+
+    const parsed = parseFinal(buf);
+    overlay.classList.remove('active');
+    renderReceipt(parsed);
+    showStage(7);
+  } catch (e) {
+    overlay.classList.remove('active');
+    renderReceipt({ story: 'Could not reach Ollama. Is it running?', societal: 5, env: 5, failure: 'ollama serve' });
+    showStage(7);
+  }
+}
+
+/* ============================================================
+   RECEIPT RENDERING
+   ============================================================ */
+function makeImpactDial(score, label) {
+  const r = 26, cx = 36, cy = 36;
+  const circ = 2 * Math.PI * r;
+  const maxArc = circ * 0.82;
+  const fillArc = Math.max(0, (score / 10) * maxArc);
+  // SVG circles start at 3 o'clock; offset to start at top-left (~8 o'clock)
+  const dashOffset = circ * 0.1;
+  const col = score <= 3 ? '#cc2222' : score <= 6 ? '#b88000' : '#1a7a3a';
+
+  return `<div class="r-impact-item">
+    <svg width="72" height="72" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#c8bfb0" stroke-width="4"
+        stroke-dasharray="${maxArc} ${circ - maxArc}"
+        stroke-dashoffset="${dashOffset}"
+        stroke-linecap="round"
+        transform="rotate(-90 ${cx} ${cy})"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${col}" stroke-width="4"
+        stroke-dasharray="${fillArc} ${circ - fillArc}"
+        stroke-dashoffset="${dashOffset}"
+        stroke-linecap="round"
+        transform="rotate(-90 ${cx} ${cy})"/>
+      <text x="${cx}" y="${cy + 6}" text-anchor="middle" font-size="18" font-weight="bold"
+        font-family="Courier New" fill="${col}">${score}</text>
+    </svg>
+    <div class="r-impact-label">${label}</div>
+  </div>`;
+}
+
+function renderReceipt(data) {
+  const body = document.getElementById('receipt-body');
+  const sz   = MODEL_SIZES[state.sizeIndex];
+  const host = HOSTING_OPTS[state.hostIndex];
+  const bm   = BM_OPTS[state.bmIndex];
+  const dt   = DT_OPTS[state.dtIndex].replace('\n', ' ');
+  const da   = DA_OPTS[state.daIndex];
+  const name = state.companyName || 'Unnamed Corp';
+  const fn   = state.companyFunction || '—';
+  const ms   = state.missionStatement || '—';
+
+  body.innerHTML = `
+    <div class="r-center r-bold" style="letter-spacing:2px;font-size:10px;margin-bottom:6px;">
+      BUILD YOUR SPECULATIVE AI COMPANY
+    </div>
+    <hr class="r-divider-d">
+
+    <div class="r-label">COMPANY</div>
+    <div class="r-value r-bold" style="font-size:13px;letter-spacing:1px;">${name}</div>
+
+    <div class="r-label">FUNCTION</div>
+    <div class="r-value" style="margin-bottom:4px;">${fn}</div>
+
+    <div class="r-label">FUNDING</div>
+    <div class="r-value">${bm}</div>
+
+    <div class="r-label">DATA</div>
+    <div class="r-value">${dt} / ${da}</div>
+
+    <div class="r-label">MODEL</div>
+    <div class="r-value">${sz} params &bull; ${host}</div>
+
+    <hr class="r-divider">
+
+    <div class="r-label">MISSION STATEMENT</div>
+    <div class="r-mission" style="margin-top:4px;">&ldquo;${ms}&rdquo;</div>
+
+    <hr class="r-divider">
+
+    <div class="r-label" style="margin-bottom:6px;">COMPANY STORY</div>
+    <div class="r-story">${data.story || '—'}</div>
+
+    <hr class="r-divider">
+
+    <div class="r-impact-row">
+      ${makeImpactDial(data.societal, 'SOCIETAL IMPACT')}
+      ${makeImpactDial(data.env, 'ENV. IMPACT')}
+    </div>
+
+    <hr class="r-divider">
+
+    <div class="r-label">RISK FACTOR</div>
+    <div class="r-risk" style="margin-top:4px;">${data.failure || '—'}</div>
+
+    <hr class="r-divider-d">
+
+    <div class="r-center r-small" style="margin-top:8px;">THANK YOU FOR BUILDING</div>
+    <div class="r-center r-small">RESPONSIBLY (?)</div>
+    <div class="r-center r-small" style="margin-top:6px;color:#aaa;">&#9632; &#9632; &#9632;</div>
+  `;
+
+  // Trigger print animation on next frame
+  const receipt = document.getElementById('receipt');
+  receipt.classList.remove('printing');
+  receipt.style.transition = 'none';
+  receipt.style.transform  = 'translateY(-110%)';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    receipt.style.transition = '';
+    receipt.classList.add('printing');
+  }));
+}
+
+/* ============================================================
+   STAGE NAVIGATION
+   ============================================================ */
+function showStage(n) {
+  const total = 7; // 0-6 are input stages, 7 is output
+  n = Math.max(0, Math.min(7, n));
+
+  document.querySelectorAll('.stage-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`stage-${n}`).classList.add('active');
+
+  state.stage = n;
+
+  // Progress bar
+  document.querySelectorAll('.prog-seg').forEach((seg, i) => {
+    seg.classList.remove('active', 'complete');
+    if (i < n) seg.classList.add('complete');
+    else if (i === n) seg.classList.add('active');
+  });
+
+  // Nav bar
+  const navBar   = document.getElementById('nav-bar');
+  const backBtn  = document.getElementById('back-btn');
+  const nextBtn  = document.getElementById('next-btn');
+  navBar.style.display = n === 7 ? 'none' : 'flex';
+  backBtn.disabled = (n === 0);
+  nextBtn.textContent = n === 6 ? 'GENERATE →' : 'NEXT →';
+
+  // Lazy init
+  if (!stageInited.has(n)) {
+    stageInited.add(n);
+    if      (n === 0) initStage0();
+    else if (n === 1) initStage1();
+    else if (n === 2) initStage2();
+    else if (n === 3) initStage3();
+    else if (n === 4) initStage4();
+    else if (n === 5) initStage5();
+    else if (n === 6) initStage6();
+  }
+}
+
+/* ============================================================
+   PROGRESS BAR INIT
+   ============================================================ */
+function buildProgressBar() {
+  const bar = document.getElementById('progress-bar');
+  bar.innerHTML = '';
+  // 8 segments: stages 0-6 (inputs) + stage 7 (output)
+  for (let i = 0; i <= 7; i++) {
+    const seg = document.createElement('div');
+    seg.className = 'prog-seg';
+    seg.title = ['Function','Name','Business Model','Data Type','Acquisition','Model Size','Hosting','Output'][i] || '';
+    bar.appendChild(seg);
+  }
+}
+
+/* ============================================================
+   START OVER
+   ============================================================ */
+function startOver() {
+  Object.assign(state, {
+    stage: 0,
+    companyFunction: '', missionStatement: '', companyName: '',
+    bmIndex: 0, dtIndex: 0, daIndex: 0, sizeIndex: 2, hostIndex: 0,
+    bmDescs: null, dtDescs: null, daDescs: null,
+    generatedNames: [], abortController: null,
+  });
+  stageInited.clear();
+
+  // Reset all stage panels
+  ['s0-wrap','s1-wrap','s5-wrap'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.innerHTML = '';
+  });
+  ['k2-wrap','k3-wrap','k4-wrap','k6-wrap'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.innerHTML = '';
+  });
+  document.querySelectorAll('.knob-desc-text, .static-desc').forEach(el => el.textContent = '');
+  document.querySelectorAll('.llm-loading').forEach(el => el.style.display = 'none');
+
+  document.getElementById('s0-fn').textContent = 'Move the slider to generate a company concept.';
+  document.getElementById('s0-ms').textContent = '';
+  document.getElementById('s1-name').textContent = '—';
+  document.getElementById('receipt-body').innerHTML = '';
+  document.getElementById('nav-bar').style.display = 'flex';
+
+  showStage(0);
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', () => {
+  buildProgressBar();
+
+  document.getElementById('back-btn').addEventListener('click',  () => showStage(state.stage - 1));
+  document.getElementById('next-btn').addEventListener('click',  () => {
+    if (state.stage === 6) generateFinal();
+    else showStage(state.stage + 1);
+  });
+  document.getElementById('generate-btn').addEventListener('click', generateFinal);
+  document.getElementById('start-over-btn').addEventListener('click', startOver);
+
+  showStage(0);
+});
+</script>
+</body>
+</html>
