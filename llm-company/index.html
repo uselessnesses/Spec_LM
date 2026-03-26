@@ -1184,8 +1184,9 @@ const state = {
   daDescs:  null,
   generatedNames: [],
   abortController: null,
-  activeSlider: null,   // current HorizontalSlider (for knob polling)
-  activeDial:   null,   // current RotaryDial (for knob polling)
+  activeSlider:    null,  // current stage's HorizontalSlider (knob controls this)
+  activeDial:      null,  // current stage's RotaryDial (knob controls this)
+  modelSizeSlider: null,  // stage-5 slider — always controlled by physical slider
 };
 
 const stageInited = new Set();
@@ -1490,7 +1491,7 @@ function initStage5() {
   const wrap = document.getElementById('s5-wrap');
   const descEl = document.getElementById('s5-desc');
 
-  state.activeSlider = new HorizontalSlider({
+  state.activeSlider = state.modelSizeSlider = new HorizontalSlider({
     container:  wrap,
     positions:  6,
     showLabels: true,
@@ -1757,7 +1758,8 @@ function startOver() {
   document.getElementById('nav-bar').style.display = 'flex';
   document.getElementById('generate-btn').disabled = false;
   document.getElementById('receipt-printer-wrap').style.overflow = 'hidden';
-  _lastKnobIdx = -1;
+  _lastKnobIdx  = -1;
+  _lastSliderIdx = -1;
 
   showStage(0);
 }
@@ -1765,10 +1767,11 @@ function startOver() {
 /* ============================================================
    ARDUINO KNOB POLLING
    ============================================================ */
-let _knobTimer = null;
-let _lastKnobIdx = -1;
+let _knobTimer    = null;
+let _lastKnobIdx  = -1;
+let _lastSliderIdx = -1;
 
-function mapKnobToIndex(raw, positions) {
+function mapToIndex(raw, positions) {
   return Math.round((raw / 1023) * (positions - 1));
 }
 
@@ -1778,15 +1781,33 @@ function startKnobPoll() {
     if (state.stage === 7) return;
     try {
       const r = await fetch('/api/knob');
-      const { value } = await r.json();
+      const { knob, slider } = await r.json();
+
+      // Physical knob → current stage's active control
       const ctrl = state.activeSlider || state.activeDial;
-      if (!ctrl) return;
-      const positions = state.activeSlider ? state.activeSlider.positions : state.activeDial.n;
-      const idx = mapKnobToIndex(value, positions);
-      if (idx !== _lastKnobIdx) {
-        _lastKnobIdx = idx;
-        ctrl._snapTo(idx, true);
-        if (typeof ctrl.onChange === 'function') ctrl.onChange(idx);
+      if (ctrl) {
+        const positions = state.activeSlider ? state.activeSlider.positions : state.activeDial.n;
+        const idx = mapToIndex(knob, positions);
+        if (idx !== _lastKnobIdx) {
+          _lastKnobIdx = idx;
+          ctrl._snapTo(idx, true);
+          if (typeof ctrl.onChange === 'function') ctrl.onChange(idx);
+        }
+      }
+
+      // Physical slider → model size (always, any stage)
+      const sIdx = mapToIndex(slider, MODEL_SIZES.length);
+      if (sIdx !== _lastSliderIdx) {
+        _lastSliderIdx = sIdx;
+        state.sizeIndex = sIdx;
+        // If stage 5 is active, also move the visual slider
+        if (state.modelSizeSlider) {
+          state.modelSizeSlider._snapTo(sIdx, true);
+        }
+        // Always update the description if we're on stage 5
+        if (state.stage === 5) {
+          document.getElementById('s5-desc').textContent = MODEL_SIZE_DESCS[MODEL_SIZES[sIdx]];
+        }
       }
     } catch (_) {}
   }, 100);

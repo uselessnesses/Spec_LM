@@ -4,20 +4,28 @@ import threading
 import time
 
 import requests
-import serial
-import serial.tools.list_ports
+try:
+    import serial
+    import serial.tools.list_ports
+    _SERIAL_AVAILABLE = True
+except ImportError:
+    _SERIAL_AVAILABLE = False
+    print("[SERIAL] pyserial not installed — knob disabled. Run: pip3 install pyserial")
 from flask import Flask, Response, request, send_file, stream_with_context
 
 app = Flask(__name__)
 
 # ── Arduino serial knob ───────────────────────────────────────────────────────
-SERIAL_PORT = None   # None = auto-detect; override e.g. "/dev/cu.usbmodem10"
+SERIAL_PORT = "/dev/cu.usbserial-10"
 SERIAL_BAUD = 9600
-_knob_value = 512    # default midpoint (0–1023)
-_serial_lock = threading.Lock()
+_knob_value   = 512  # A0 — controls current stage
+_slider_value = 512  # A4 — controls model size (stage 5)
+_serial_lock  = threading.Lock()
 
 
 def _find_arduino_port():
+    if not _SERIAL_AVAILABLE:
+        return None
     for p in serial.tools.list_ports.comports():
         desc = (p.description + p.hwid).lower()
         if any(k in desc for k in ('arduino', 'usbmodem', 'usbserial', 'ch340', 'cp210')):
@@ -26,7 +34,9 @@ def _find_arduino_port():
 
 
 def _serial_reader():
-    global _knob_value
+    global _knob_value, _slider_value
+    if not _SERIAL_AVAILABLE:
+        return
     port = SERIAL_PORT or _find_arduino_port()
     if not port:
         print("[SERIAL] No Arduino found — knob disabled. Set SERIAL_PORT manually if needed.")
@@ -38,9 +48,11 @@ def _serial_reader():
                 print(f"[SERIAL] Connected.")
                 while True:
                     line = ser.readline().decode("utf-8", errors="ignore").strip()
-                    if line.isdigit():
+                    parts = line.split(",")
+                    if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
                         with _serial_lock:
-                            _knob_value = int(line)
+                            _knob_value   = int(parts[0])
+                            _slider_value = int(parts[1])
         except Exception as e:
             print(f"[SERIAL] Error: {e} — retrying in 3s")
             time.sleep(3)
@@ -139,7 +151,7 @@ def index():
 @app.route("/api/knob")
 def knob():
     with _serial_lock:
-        return {"value": _knob_value}
+        return {"knob": _knob_value, "slider": _slider_value}
 
 
 @app.route("/api/company-function", methods=["POST"])
