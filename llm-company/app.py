@@ -1,10 +1,53 @@
 import json
 import os
+import threading
+import time
 
 import requests
+import serial
+import serial.tools.list_ports
 from flask import Flask, Response, request, send_file, stream_with_context
 
 app = Flask(__name__)
+
+# ── Arduino serial knob ───────────────────────────────────────────────────────
+SERIAL_PORT = None   # None = auto-detect; override e.g. "/dev/cu.usbmodem10"
+SERIAL_BAUD = 9600
+_knob_value = 512    # default midpoint (0–1023)
+_serial_lock = threading.Lock()
+
+
+def _find_arduino_port():
+    for p in serial.tools.list_ports.comports():
+        desc = (p.description + p.hwid).lower()
+        if any(k in desc for k in ('arduino', 'usbmodem', 'usbserial', 'ch340', 'cp210')):
+            return p.device
+    return None
+
+
+def _serial_reader():
+    global _knob_value
+    port = SERIAL_PORT or _find_arduino_port()
+    if not port:
+        print("[SERIAL] No Arduino found — knob disabled. Set SERIAL_PORT manually if needed.")
+        return
+    print(f"[SERIAL] Connecting to {port} at {SERIAL_BAUD} baud…")
+    while True:
+        try:
+            with serial.Serial(port, SERIAL_BAUD, timeout=2) as ser:
+                print(f"[SERIAL] Connected.")
+                while True:
+                    line = ser.readline().decode("utf-8", errors="ignore").strip()
+                    if line.isdigit():
+                        with _serial_lock:
+                            _knob_value = int(line)
+        except Exception as e:
+            print(f"[SERIAL] Error: {e} — retrying in 3s")
+            time.sleep(3)
+
+
+threading.Thread(target=_serial_reader, daemon=True).start()
+# ─────────────────────────────────────────────────────────────────────────────
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 GENERATION_MODEL = "llama3.2:3b"   # change this to use a different model
@@ -91,6 +134,12 @@ def streamed(generator):
 @app.route("/")
 def index():
     return send_file(INDEX_PATH)
+
+
+@app.route("/api/knob")
+def knob():
+    with _serial_lock:
+        return {"value": _knob_value}
 
 
 @app.route("/api/company-function", methods=["POST"])

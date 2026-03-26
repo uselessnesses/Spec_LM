@@ -1184,6 +1184,8 @@ const state = {
   daDescs:  null,
   generatedNames: [],
   abortController: null,
+  activeSlider: null,   // current HorizontalSlider (for knob polling)
+  activeDial:   null,   // current RotaryDial (for knob polling)
 };
 
 const stageInited = new Set();
@@ -1255,7 +1257,7 @@ let s0Timer = null;
 
 function initStage0() {
   const wrap = document.getElementById('s0-wrap');
-  new HorizontalSlider({
+  state.activeSlider = new HorizontalSlider({
     container: wrap,
     positions: 7,
     showLabels: false,
@@ -1264,6 +1266,7 @@ function initStage0() {
       s0Timer = setTimeout(() => triggerFunction(i + 1), 300);
     },
   });
+  state.activeDial = null;
   // Trigger initial generation
   triggerFunction(4);
 }
@@ -1315,7 +1318,7 @@ let s1Timer = null;
 
 function initStage1() {
   const wrap = document.getElementById('s1-wrap');
-  new HorizontalSlider({
+  state.activeSlider = new HorizontalSlider({
     container: wrap,
     positions: 7,
     showLabels: false,
@@ -1324,6 +1327,7 @@ function initStage1() {
       s1Timer = setTimeout(() => triggerName(), 300);
     },
   });
+  state.activeDial = null;
   triggerName();
 }
 
@@ -1417,7 +1421,7 @@ function updateKnobDesc(el, text) {
    ============================================================ */
 function initStage2() {
   const wrap = document.getElementById('k2-wrap');
-  new RotaryDial({
+  state.activeDial = new RotaryDial({
     container:   wrap,
     optionIds:   BM_KEYS,
     optionNames: BM_OPTS,
@@ -1430,6 +1434,7 @@ function initStage2() {
       }
     },
   });
+  state.activeSlider = null;
   loadDescs('business_model', BM_KEYS, 'bmDescs', 'k2-loading', 'k2-desc', state.bmIndex);
 }
 
@@ -1439,7 +1444,7 @@ function initStage2() {
 function initStage3() {
   const wrap = document.getElementById('k3-wrap');
   const displayNames = ['GENERAL\nWEB', 'BOOKS /\nACADEMIC', 'PROPRIETARY\nCLIENT', 'SOCIAL\nMEDIA'];
-  new RotaryDial({
+  state.activeDial = new RotaryDial({
     container:   wrap,
     optionIds:   DT_KEYS,
     optionNames: displayNames,
@@ -1452,6 +1457,7 @@ function initStage3() {
       }
     },
   });
+  state.activeSlider = null;
   loadDescs('data_type', DT_KEYS, 'dtDescs', 'k3-loading', 'k3-desc', state.dtIndex);
 }
 
@@ -1460,7 +1466,7 @@ function initStage3() {
    ============================================================ */
 function initStage4() {
   const wrap = document.getElementById('k4-wrap');
-  new RotaryDial({
+  state.activeDial = new RotaryDial({
     container:   wrap,
     optionIds:   DA_KEYS,
     optionNames: DA_OPTS,
@@ -1473,6 +1479,7 @@ function initStage4() {
       }
     },
   });
+  state.activeSlider = null;
   loadDescs('data_acquisition', DA_KEYS, 'daDescs', 'k4-loading', 'k4-desc', state.daIndex);
 }
 
@@ -1483,7 +1490,7 @@ function initStage5() {
   const wrap = document.getElementById('s5-wrap');
   const descEl = document.getElementById('s5-desc');
 
-  new HorizontalSlider({
+  state.activeSlider = new HorizontalSlider({
     container:  wrap,
     positions:  6,
     showLabels: true,
@@ -1493,6 +1500,7 @@ function initStage5() {
       descEl.textContent = MODEL_SIZE_DESCS[MODEL_SIZES[i]];
     },
   });
+  state.activeDial = null;
   descEl.textContent = MODEL_SIZE_DESCS[MODEL_SIZES[state.sizeIndex]];
 }
 
@@ -1502,7 +1510,7 @@ function initStage5() {
 function initStage6() {
   const wrap   = document.getElementById('k6-wrap');
   const descEl = document.getElementById('k6-desc');
-  new RotaryDial({
+  state.activeDial = new RotaryDial({
     container:   wrap,
     optionIds:   HOSTING_OPTS,
     optionNames: HOSTING_OPTS,
@@ -1513,6 +1521,7 @@ function initStage6() {
       descEl.textContent = HOSTING_DESCS[HOSTING_OPTS[i]];
     },
   });
+  state.activeSlider = null;
   descEl.textContent = HOSTING_DESCS[HOSTING_OPTS[state.hostIndex]];
 }
 
@@ -1748,8 +1757,39 @@ function startOver() {
   document.getElementById('nav-bar').style.display = 'flex';
   document.getElementById('generate-btn').disabled = false;
   document.getElementById('receipt-printer-wrap').style.overflow = 'hidden';
+  _lastKnobIdx = -1;
 
   showStage(0);
+}
+
+/* ============================================================
+   ARDUINO KNOB POLLING
+   ============================================================ */
+let _knobTimer = null;
+let _lastKnobIdx = -1;
+
+function mapKnobToIndex(raw, positions) {
+  return Math.round((raw / 1023) * (positions - 1));
+}
+
+function startKnobPoll() {
+  clearInterval(_knobTimer);
+  _knobTimer = setInterval(async () => {
+    if (state.stage === 7) return;
+    try {
+      const r = await fetch('/api/knob');
+      const { value } = await r.json();
+      const ctrl = state.activeSlider || state.activeDial;
+      if (!ctrl) return;
+      const positions = state.activeSlider ? state.activeSlider.positions : state.activeDial.n;
+      const idx = mapKnobToIndex(value, positions);
+      if (idx !== _lastKnobIdx) {
+        _lastKnobIdx = idx;
+        ctrl._snapTo(idx, true);
+        if (typeof ctrl.onChange === 'function') ctrl.onChange(idx);
+      }
+    } catch (_) {}
+  }, 100);
 }
 
 /* ============================================================
@@ -1757,6 +1797,7 @@ function startOver() {
    ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
   buildProgressBar();
+  startKnobPoll();
 
   document.getElementById('back-btn').addEventListener('click',  () => showStage(state.stage - 1));
   document.getElementById('next-btn').addEventListener('click',  () => {
