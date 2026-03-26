@@ -101,16 +101,17 @@ def company_function():
 
     prompt = (
         "Generate a short description of a fictional AI company. Include:\n"
-        "1. What the company does (one sentence, specific and concrete)\n"
-        "2. A 2-3 sentence mission statement / manifesto for the company\n\n"
+        "1. What the company does (one sentence, max 20 words, specific and concrete)\n"
+        "2. A mission statement / manifesto for the company (2 sentences maximum)\n\n"
         f"Ethical tone: {tone}\n\n"
-        "Generate something different from previous responses. Be creative and specific.\n\n"
+        "Generate something different from previous responses. Be creative and specific.\n"
+        "Do NOT invent a company name.\n\n"
         "Respond in EXACTLY this format, nothing else:\n"
         "FUNCTION: [what the company does]\n"
         "MISSION: [the mission statement / manifesto]"
     )
 
-    return streamed(stream_ollama(prompt, num_predict=180, temperature=0.92))
+    return streamed(stream_ollama(prompt, num_predict=100, temperature=0.92))
 
 
 @app.route("/api/company-name", methods=["POST"])
@@ -146,9 +147,9 @@ def describe():
     if stage == "business_model":
         prompt = (
             f'An AI company called "{company_name}" does the following: "{company_function}"\n\n'
-            "For each of the following funding models, write 1-2 sentences explaining what "
-            "this funding model would specifically mean for this company. Be concrete — who "
-            "has power, what pressures exist, what compromises might be made.\n\n"
+            "For each of the following funding models, write one sentence only (max 20 words) "
+            "on what it would specifically mean for this company — who has power and what "
+            "compromises might be made.\n\n"
             "Respond in EXACTLY this format:\n"
             "GOVT_GRANTS: [explanation]\n"
             "PAY_TO_PLAY: [explanation]\n"
@@ -158,9 +159,8 @@ def describe():
     elif stage == "data_type":
         prompt = (
             f'An AI company called "{company_name}" does the following: "{company_function}"\n\n'
-            "For each of the following training data types, write 1-2 sentences explaining "
-            "what this data would actually look like for this specific company, and what "
-            "the implications are.\n\n"
+            "For each of the following training data types, write one sentence only (max 20 words) "
+            "on what this data would mean for this specific company.\n\n"
             "Respond in EXACTLY this format:\n"
             "GENERAL_WEB: [explanation]\n"
             "BOOKS_ACADEMIC: [explanation]\n"
@@ -172,9 +172,8 @@ def describe():
         prompt = (
             f'An AI company called "{company_name}" does the following: "{company_function}". '
             f"It trains its model on {data_type_label} data.\n\n"
-            "For each of the following data acquisition methods, write 1-2 sentences explaining "
-            "what this method would specifically mean for this company. What are the ethical "
-            "and practical implications?\n\n"
+            "For each of the following data acquisition methods, write one sentence only "
+            "(max 20 words) on what this would mean for this company.\n\n"
             "Respond in EXACTLY this format:\n"
             "SCRAPED: [explanation]\n"
             "LICENSED: [explanation]\n"
@@ -184,7 +183,7 @@ def describe():
     else:
         return streamed(iter(["Unknown stage"]))
 
-    return streamed(stream_ollama(prompt, num_predict=250, temperature=0.8))
+    return streamed(stream_ollama(prompt, num_predict=130, temperature=0.8))
 
 
 @app.route("/api/generate", methods=["POST"])

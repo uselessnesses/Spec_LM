@@ -107,6 +107,7 @@ html, body {
   transition: all 0.15s;
 }
 #generate-btn:hover { background: var(--glow); }
+#generate-btn:disabled { opacity: 0.2; cursor: not-allowed; }
 
 /* ============================================================
    STAGE CONTAINER
@@ -233,7 +234,7 @@ html, body {
   border: 1px solid var(--border);
   border-radius: 2px;
   padding: 16px;
-  min-height: 90px;
+  min-height: 160px;
   position: relative;
 }
 
@@ -422,7 +423,6 @@ html, body {
 
 .receipt-printer-wrap {
   overflow: hidden;
-  max-height: calc(100vh - var(--status-h) - var(--nav-h) - 80px);
   display: flex;
   justify-content: center;
 }
@@ -512,6 +512,15 @@ html, body {
   font-size: 12px;
   letter-spacing: 3px;
   color: var(--dim);
+}
+.gen-story {
+  max-width: 360px;
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.65;
+  text-align: center;
+  opacity: 0.8;
+  min-height: 3em;
 }
 .gen-dots { display: flex; gap: 8px; }
 .gen-dot {
@@ -743,6 +752,7 @@ html, body {
     <div class="gen-dot"></div><div class="gen-dot"></div><div class="gen-dot"></div>
   </div>
   <div class="gen-msg">GENERATING ANALYSIS</div>
+  <div class="gen-story" id="gen-story"></div>
 </div>
 
 <script>
@@ -1130,22 +1140,23 @@ class HorizontalSlider {
 /* ============================================================
    STATIC DATA
    ============================================================ */
-const MODEL_SIZES = ['1B', '3B', '7B', '14B', '32B'];
+const MODEL_SIZES = ['1B', '7B', '14B', '80B', '140B', '700B'];
 
 const MODEL_SIZE_DESCS = {
-  '1B':  'Runs on a laptop or basic GPU. Fast inference, very low energy. Good for simple classification or extraction tasks. Will hallucinate on complex reasoning and struggle with nuance. Accessible — individuals and small orgs can run it locally.',
-  '3B':  'Consumer GPU territory (~8GB VRAM). Good balance for focused, well-defined tasks. Reasonable energy use. Still feasible for smaller organisations. Not powerful enough for open-ended reasoning or long-context work.',
-  '7B':  'Needs a decent GPU (16–24GB VRAM). Solid general capability — handles most language tasks competently. Moderate energy and infrastructure cost. The current sweet spot for many real-world deployments.',
-  '14B': 'Requires a high-end consumer GPU or small server. Noticeably more capable than 7B but operational costs rise. High energy use per query at scale. Starting to concentrate accessibility toward well-resourced organisations.',
-  '32B': 'Data-centre scale — multi-GPU server required. State-of-the-art reasoning and instruction following. Enormous energy footprint; significant compute cost per query. Only major corporations or well-funded labs can run this affordably at scale.',
+  '1B':   'Runs on a laptop CPU. Inference is near-instant, energy cost is negligible. Suitable for narrow, well-defined tasks — anything requiring real reasoning will fail.',
+  '7B':   'Runs on a consumer GPU (8GB VRAM) or a high-end laptop. Competent at focused language tasks. The minimum viable size for most deployed products.',
+  '14B':  'Still runs on a laptop (slowly) or a consumer GPU (16GB VRAM). Meaningfully more capable, but inference is slower and energy cost starts to matter.',
+  '80B':  'Requires a dedicated GPU server or cloud instance. State-of-the-art reasoning. Only accessible to organisations with real infrastructure budgets.',
+  '140B': 'Needs multi-GPU infrastructure — beyond the reach of most organisations. High energy and cooling costs. Capable of near-frontier performance.',
+  '700B': 'Data-centre-scale only. Enormous energy and hardware footprint. This is hyperscaler territory — the kind of infrastructure only a handful of organisations on earth can run.',
 };
 
 const HOSTING_OPTS = ['CLOUD', 'ON-PREMISE', 'EDGE', 'DECENTRALISED'];
 const HOSTING_DESCS = {
-  'CLOUD':         'Runs on AWS, Azure, or Google Cloud. Scalable and reliable with managed infrastructure, but your data flows through Big Tech servers. Subject to their terms, pricing changes, and government data requests. Contributes to tech monopoly concentration.',
-  'ON-PREMISE':    'Company owns and operates the servers. Full control over data and compliance — nothing leaves the building. Expensive to maintain and scale. Energy use is the company\'s direct responsibility. Requires significant internal technical expertise.',
-  'EDGE':          'Runs on user devices — phones, laptops, local hardware. Maximum privacy: data never leaves the device. Limited by hardware constraints, so only smaller models are viable. Creates a digital divide: only users with capable devices can access it.',
-  'DECENTRALISED': 'Distributed across many independently-operated nodes — resilient to censorship or single-point failure. Coordination is difficult, quality control is hard, and governance is an unsolved problem. Novel and experimental. Who moderates what no one owns?',
+  'CLOUD':         'Runs on rented AWS/Azure/GCP infrastructure. Scales easily but creates dependency on Big Tech and leaves data in third-party hands.',
+  'ON-PREMISE':    'Company-owned servers. Full data control and no cloud dependency, but high upfront cost and the company must handle all maintenance.',
+  'EDGE':          'Runs on the user\'s own device. Maximum privacy — data never leaves the user — but constrains model size to what the device can handle.',
+  'DECENTRALISED': 'Distributed across peer nodes. Censorship-resistant and no single point of failure, but governance is hard and quality is unpredictable.',
 };
 
 const BM_OPTS  = ['GOVT GRANTS', 'PAY TO PLAY', 'BIG LOAN', 'RICH DONOR'];
@@ -1374,11 +1385,17 @@ async function loadDescs(stage, keys, descKey, loadingId, descId, currentIndex) 
       company_function: state.companyFunction || 'an AI service',
       stage,
       data_type: stage === 'data_acquisition' ? dtLabel : undefined,
-    }, (chunk) => { buf = chunk; }, null);
+    }, (chunk) => {
+      buf = chunk;
+      // Show raw streaming text live — hide spinner once first chunk arrives
+      if (loading.style.display !== 'none') {
+        loading.style.display = 'none';
+        descEl.style.display = '';
+      }
+      descEl.textContent = buf;
+    }, null);
 
     state[descKey] = parseKeyedText(buf, keys);
-    loading.style.display = 'none';
-    descEl.style.display  = '';
     updateKnobDesc(descEl, state[descKey][keys[currentIndex]] || '—');
   } catch (e) {
     loading.style.display = 'none';
@@ -1468,7 +1485,7 @@ function initStage5() {
 
   new HorizontalSlider({
     container:  wrap,
-    positions:  5,
+    positions:  6,
     showLabels: true,
     labels:     MODEL_SIZES,
     onChange: (i) => {
@@ -1503,7 +1520,9 @@ function initStage6() {
    GENERATE FINAL
    ============================================================ */
 async function generateFinal() {
-  const overlay = document.getElementById('gen-overlay');
+  const overlay   = document.getElementById('gen-overlay');
+  const storyEl   = document.getElementById('gen-story');
+  storyEl.textContent = '';
   overlay.classList.add('active');
 
   try {
@@ -1517,7 +1536,11 @@ async function generateFinal() {
       data_acquisition: DA_OPTS[state.daIndex],
       model_size:       MODEL_SIZES[state.sizeIndex],
       hosting:          HOSTING_OPTS[state.hostIndex],
-    }, (chunk) => { buf = chunk; }, null);
+    }, (chunk) => {
+      buf = chunk;
+      const m = buf.match(/STORY:\s*([\s\S]*?)(?=\n\nSOCIETAL_IMPACT:|$)/i);
+      if (m) storyEl.textContent = m[1].trim();
+    }, null);
 
     const parsed = parseFinal(buf);
     overlay.classList.remove('active');
@@ -1624,13 +1647,19 @@ function renderReceipt(data) {
 
   // Trigger print animation on next frame
   const receipt = document.getElementById('receipt');
+  const wrap    = document.getElementById('receipt-printer-wrap');
+  wrap.style.overflow = 'hidden';
   receipt.classList.remove('printing');
   receipt.style.transition = 'none';
   receipt.style.transform  = 'translateY(-110%)';
   requestAnimationFrame(() => requestAnimationFrame(() => {
     receipt.style.transition = '';
+    receipt.style.transform  = '';   // clear inline so class rule applies
     receipt.classList.add('printing');
   }));
+  receipt.addEventListener('transitionend', () => {
+    wrap.style.overflow = 'visible';
+  }, { once: true });
 }
 
 /* ============================================================
@@ -1659,6 +1688,7 @@ function showStage(n) {
   navBar.style.display = n === 7 ? 'none' : 'flex';
   backBtn.disabled = (n === 0);
   nextBtn.textContent = n === 6 ? 'GENERATE →' : 'NEXT →';
+  document.getElementById('generate-btn').disabled = (n === 7);
 
   // Lazy init
   if (!stageInited.has(n)) {
@@ -1716,6 +1746,8 @@ function startOver() {
   document.getElementById('s1-name').textContent = '—';
   document.getElementById('receipt-body').innerHTML = '';
   document.getElementById('nav-bar').style.display = 'flex';
+  document.getElementById('generate-btn').disabled = false;
+  document.getElementById('receipt-printer-wrap').style.overflow = 'hidden';
 
   showStage(0);
 }
