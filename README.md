@@ -11,14 +11,14 @@ The output appears as a thermal printer receipt.
 - Python 3.8+
 - [Ollama](https://ollama.com) running locally
 - `llama3.2:3b` model pulled (or change `GENERATION_MODEL` in `app.py`)
+- Optional: Arduino Mega + two potentiometers (see [Hardware](#hardware) below)
 
 ---
 
 ## Setup
 
 ```bash
-cd llm-company
-pip install flask requests
+pip install flask requests pyserial
 
 # Pull the model (first time only)
 ollama pull llama3.2:3b
@@ -31,6 +31,64 @@ python app.py
 ```
 
 Open **http://localhost:5002** in your browser.
+
+---
+
+## Hardware
+
+The app supports optional physical controls: a rotary knob (controls the current stage) and a linear slider (controls Model Size from any stage).
+
+### Wiring
+
+**Linear slider (A4 → Model Size)**
+
+Use pins **1, 2, 3** — not the primed variants (1′, 2′, 3′) that may also be present on the component.
+
+| Slider pin             | Arduino pin |
+|------------------------|-------------|
+| Pin 1 (left)           | GND         |
+| Pin 2 (middle / wiper) | A4          |
+| Pin 3 (right)          | 5V          |
+
+**Rotary knob (A0 → current stage)**
+
+Looking at the flat face of the potentiometer with the shaft pointing away from you, the pins left to right are:
+
+| Knob pin | Arduino pin |
+|----------|-------------|
+| Left | GND |
+| Middle (wiper) | A0 |
+| Right | 5V |
+
+### Arduino sketch
+
+Upload this to the board:
+
+```cpp
+void setup() {
+  Serial.begin(9600);
+}
+
+void loop() {
+  int knob   = analogRead(A0);
+  int slider = analogRead(A4);
+  Serial.print(knob);
+  Serial.print(",");
+  Serial.println(slider);
+  delay(50);
+}
+```
+
+### Connecting
+
+The app auto-detects common USB-serial adapters (CH340, CP210x, usbmodem). If it doesn't find the port automatically, set it manually at the top of `app.py`:
+
+```python
+SERIAL_PORT = "/dev/cu.usbserial-10"  # macOS example
+SERIAL_PORT = "COM3"                   # Windows example
+```
+
+Close the Arduino IDE's Serial Monitor before running — it will block the port.
 
 ---
 

@@ -109,6 +109,19 @@ html, body {
 #generate-btn:hover { background: var(--glow); }
 #generate-btn:disabled { opacity: 0.2; cursor: not-allowed; }
 
+#debug-overlay {
+  position: fixed;
+  bottom: 60px;
+  right: 12px;
+  font-family: var(--font);
+  font-size: 10px;
+  color: var(--dim);
+  line-height: 1.8;
+  letter-spacing: 1px;
+  pointer-events: none;
+  z-index: 50;
+}
+
 /* ============================================================
    STAGE CONTAINER
    ============================================================ */
@@ -745,6 +758,12 @@ html, body {
   </div>
 
 </div><!-- /app -->
+
+<!-- Debug overlay -->
+<div id="debug-overlay">
+  <div>KNOB  raw:<span id="dbg-knob-raw">—</span> smooth:<span id="dbg-knob-sm">—</span> → <span id="dbg-knob-idx">—</span></div>
+  <div>SLIDE raw:<span id="dbg-slide-raw">—</span> smooth:<span id="dbg-slide-sm">—</span> → <span id="dbg-slide-idx">—</span></div>
+</div>
 
 <!-- Generating overlay -->
 <div id="gen-overlay">
@@ -1700,6 +1719,12 @@ function showStage(n) {
   nextBtn.textContent = n === 6 ? 'GENERATE →' : 'NEXT →';
   document.getElementById('generate-btn').disabled = (n === 7);
 
+  // Force physical controls to re-sync on next poll (position may not have changed)
+  _lastKnobIdx   = -1;
+  _lastSliderIdx = -1;
+  _lastKnobRaw   = -1;
+  _lastSliderRaw = -1;
+
   // Lazy init
   if (!stageInited.has(n)) {
     stageInited.add(n);
@@ -1758,8 +1783,10 @@ function startOver() {
   document.getElementById('nav-bar').style.display = 'flex';
   document.getElementById('generate-btn').disabled = false;
   document.getElementById('receipt-printer-wrap').style.overflow = 'hidden';
-  _lastKnobIdx  = -1;
+  _lastKnobIdx   = -1;
   _lastSliderIdx = -1;
+  _lastKnobRaw   = -1;
+  _lastSliderRaw = -1;
 
   showStage(0);
 }
@@ -1767,12 +1794,18 @@ function startOver() {
 /* ============================================================
    ARDUINO KNOB POLLING
    ============================================================ */
-let _knobTimer    = null;
-let _lastKnobIdx  = -1;
+let _knobTimer     = null;
+let _lastKnobIdx   = -1;
 let _lastSliderIdx = -1;
+let _lastKnobRaw   = -1;
+let _lastSliderRaw = -1;
+const DEADBAND = 12;  // raw units (out of 1023) — filters jitter at position boundaries
 
 function mapToIndex(raw, positions) {
   return Math.round((raw / 1023) * (positions - 1));
+}
+function mapToIndexInverted(raw, positions) {
+  return Math.round(((1023 - raw) / 1023) * (positions - 1));
 }
 
 function startKnobPoll() {
@@ -1781,13 +1814,22 @@ function startKnobPoll() {
     if (state.stage === 7) return;
     try {
       const r = await fetch('/api/knob');
-      const { knob, slider } = await r.json();
+      const { knob, slider, knob_raw, slider_raw } = await r.json();
 
-      // Physical knob → current stage's active control
+      // Always update debug display
       const ctrl = state.activeSlider || state.activeDial;
-      if (ctrl) {
-        const positions = state.activeSlider ? state.activeSlider.positions : state.activeDial.n;
-        const idx = mapToIndex(knob, positions);
+      const positions = ctrl ? (state.activeSlider ? state.activeSlider.positions : state.activeDial.n) : '?';
+      document.getElementById('dbg-knob-raw').textContent  = knob_raw;
+      document.getElementById('dbg-knob-sm').textContent   = knob;
+      document.getElementById('dbg-knob-idx').textContent  = ctrl ? mapToIndexInverted(knob, positions) : '—';
+      document.getElementById('dbg-slide-raw').textContent = slider_raw;
+      document.getElementById('dbg-slide-sm').textContent  = slider;
+      document.getElementById('dbg-slide-idx').textContent = mapToIndex(slider, MODEL_SIZES.length);
+
+      // Physical knob → current stage's active control (with dead-band)
+      if (ctrl && (_lastKnobRaw === -1 || Math.abs(knob - _lastKnobRaw) >= DEADBAND)) {
+        const idx = mapToIndexInverted(knob, positions);
+        _lastKnobRaw = knob;
         if (idx !== _lastKnobIdx) {
           _lastKnobIdx = idx;
           ctrl._snapTo(idx, true);
@@ -1795,18 +1837,17 @@ function startKnobPoll() {
         }
       }
 
-      // Physical slider → model size (always, any stage)
-      const sIdx = mapToIndex(slider, MODEL_SIZES.length);
-      if (sIdx !== _lastSliderIdx) {
-        _lastSliderIdx = sIdx;
-        state.sizeIndex = sIdx;
-        // If stage 5 is active, also move the visual slider
-        if (state.modelSizeSlider) {
-          state.modelSizeSlider._snapTo(sIdx, true);
-        }
-        // Always update the description if we're on stage 5
-        if (state.stage === 5) {
-          document.getElementById('s5-desc').textContent = MODEL_SIZE_DESCS[MODEL_SIZES[sIdx]];
+      // Physical slider → model size (with dead-band)
+      if (_lastSliderRaw === -1 || Math.abs(slider - _lastSliderRaw) >= DEADBAND) {
+        const sIdx = mapToIndex(slider, MODEL_SIZES.length);
+        _lastSliderRaw = slider;
+        if (sIdx !== _lastSliderIdx) {
+          _lastSliderIdx = sIdx;
+          state.sizeIndex = sIdx;
+          if (state.modelSizeSlider) state.modelSizeSlider._snapTo(sIdx, true);
+          if (state.stage === 5) {
+            document.getElementById('s5-desc').textContent = MODEL_SIZE_DESCS[MODEL_SIZES[sIdx]];
+          }
         }
       }
     } catch (_) {}
