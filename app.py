@@ -242,9 +242,9 @@ def generate():
         "STORY:\n"
         "[3-4 sentence speculative narrative of this organisation's arc — its founding, its peak, "
         "and most likely end. Be specific to the choices made. Be matter-of-fact, not preachy.]\n\n"
-        f"ENV_SUMMARY: [15-20 words explaining the {env_score}/10 environmental impact score]\n\n"
-        f"SOCIAL_SUMMARY: [15-20 words explaining the {social_score}/10 social impact score]\n\n"
-        f"PRACTICALITY_SUMMARY: [15-20 words explaining the {prac_score}/10 practicality score]"
+        f"ENV_SUMMARY: [10-12 words explaining the {env_score}/10 environmental impact score]\n\n"
+        f"SOCIAL_SUMMARY: [10-12 words explaining the {social_score}/10 social impact score]\n\n"
+        f"PRACTICALITY_SUMMARY: [10-12 words explaining the {prac_score}/10 practicality score]"
     )
 
     def gen_with_scores():

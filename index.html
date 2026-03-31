@@ -20,7 +20,7 @@
   --amber:    #ffcc00;
   --red:      #ff4444;
   --text:     #e0e0e0;
-  --dim:      #555;
+  --dim:      #777;
   --muted:    #2e2e2e;
   --font:     'Courier New', Courier, monospace;
   --status-h: 44px;
@@ -37,7 +37,7 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   overflow: hidden;
 }
@@ -67,7 +67,7 @@ html, body {
 }
 
 #app-title {
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 2.5px;
   color: var(--accent);
   white-space: nowrap;
@@ -106,8 +106,8 @@ html, body {
   flex-direction: column;
   width: 100%;
   height: 100%;
-  padding: 12px 16px;
-  gap: 10px;
+  padding: 16px 20px;
+  gap: 14px;
 }
 .screen-panel.active { display: flex; }
 
@@ -120,14 +120,14 @@ html, body {
 }
 
 .screen-num {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 3px;
   color: var(--dim);
   margin-bottom: 4px;
 }
 
 .screen-title {
-  font-size: 14px;
+  font-size: 18px;
   letter-spacing: 3px;
   color: var(--text);
   font-weight: normal;
@@ -138,7 +138,7 @@ html, body {
    ============================================================ */
 .dual-knob-row {
   display: flex;
-  gap: 10px;
+  gap: 14px;
   flex: 1;
   min-height: 0;
 }
@@ -153,8 +153,8 @@ html, body {
   background: var(--panel2);
   border: 1px solid var(--border);
   border-radius: 2px;
-  padding: 10px 8px;
-  gap: 6px;
+  padding: 16px 12px;
+  gap: 8px;
   overflow: visible;
 }
 
@@ -164,7 +164,7 @@ html, body {
 }
 
 .ctrl-label {
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 3px;
   color: var(--dim);
   align-self: center;
@@ -173,20 +173,19 @@ html, body {
 }
 
 .ctrl-name {
-  font-size: 10px;
-  letter-spacing: 2px;
+  font-size: 14px;
+  letter-spacing: 1.5px;
   color: var(--accent);
   text-align: center;
-  min-height: 14px;
+  min-height: 16px;
   flex-shrink: 0;
   line-height: 1.3;
 }
 
 .ctrl-desc {
-  font-size: 11px;
-  color: var(--text);
-  line-height: 1.6;
-  opacity: 0.7;
+  font-size: 14px;
+  color: #bbb;
+  line-height: 1.65;
   text-align: center;
   flex: 1;
   overflow-y: auto;
@@ -206,8 +205,8 @@ html, body {
   width: 100%;
   align-items: flex-start;
   flex-direction: column;
-  padding: 10px 14px;
-  gap: 6px;
+  padding: 16px 18px;
+  gap: 8px;
 }
 
 .slider-panel .ctrl-label { align-self: flex-start; }
@@ -233,7 +232,7 @@ html, body {
 }
 
 .slider-label-item {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1px;
   color: var(--dim);
   text-align: center;
@@ -337,7 +336,7 @@ html, body {
   background: #f5f0e8;
   color: #1a1a1a;
   font-family: 'Courier New', Courier, monospace;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   box-shadow: 0 8px 48px rgba(0,0,0,0.85), 0 2px 8px rgba(0,0,0,0.5);
   transform: translateY(-110%);
@@ -365,25 +364,17 @@ html, body {
 .r-divider-d { border: none; border-top: 1px solid #b0a898; margin: 10px 0; }
 .r-center    { text-align: center; }
 .r-bold      { font-weight: bold; }
-.r-small     { font-size: 10px; color: #666; }
+.r-small     { font-size: 11px; color: #666; }
 .r-story     { color: #222; line-height: 1.6; }
-.r-label     { font-size: 10px; letter-spacing: 1px; color: #888; margin-bottom: 2px; }
+.r-label     { font-size: 11px; letter-spacing: 1px; color: #888; margin-bottom: 2px; }
 .r-value     { color: #111; margin-bottom: 6px; }
-.r-impact-row {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  margin: 8px 0;
-}
-.r-impact-item { text-align: center; }
-.r-impact-label { font-size: 9px; letter-spacing: 1px; color: #888; margin-top: 4px; }
-.r-impact-summary {
-  font-size: 10px;
-  color: #444;
-  line-height: 1.5;
-  margin-top: 3px;
-  font-style: italic;
-}
+.r-score-block  { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; }
+.r-score-dial   { flex-shrink: 0; }
+.r-score-text   { flex: 1; min-width: 0; }
+.r-score-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+.r-score-title  { font-size: 10px; letter-spacing: 1px; color: #666; font-weight: bold; }
+.r-score-num    { font-size: 14px; font-weight: bold; white-space: nowrap; }
+.r-score-summary{ font-size: 10px; color: #444; line-height: 1.55; font-style: italic; }
 .r-write-line {
   border-bottom: 1px dashed #b0a898;
   height: 22px;
@@ -421,7 +412,7 @@ html, body {
 
 .nav-btn {
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 2px;
   padding: 8px 20px;
   background: transparent;
@@ -457,13 +448,13 @@ html, body {
 }
 #gen-overlay.active { display: flex; }
 .gen-msg {
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 3px;
   color: var(--dim);
 }
 .gen-story {
   max-width: 360px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text);
   line-height: 1.65;
   text-align: center;
@@ -1431,7 +1422,7 @@ async function generateFinal() {
       }
       // Show story in overlay as it streams
       const rest = buf.replace(/^__SCORES__:[^\n]*\n/, '');
-      const m = rest.match(/STORY:\s*([\s\S]*?)(?=\n\nENV_SUMMARY:|$)/i);
+      const m = rest.match(/STORY:\s*([\s\S]*?)(?=\n+(?:ENV|SOCIAL|PRACTICALITY)[^\n]*SUMMARY:|$)/i);
       if (m) storyEl.textContent = m[1].trim();
     });
 
@@ -1451,44 +1442,59 @@ async function generateFinal() {
    ============================================================ */
 function parseFinal(text) {
   const clean = text.replace(/^__SCORES__:[^\n]*\n/, '');
-  const story    = (clean.match(/STORY:\s*([\s\S]*?)(?=\n\nENV_SUMMARY:|$)/i) || [])[1] || '';
-  const envSum   = (clean.match(/ENV_SUMMARY:\s*([^\n]+)/i) || [])[1] || '';
-  const socSum   = (clean.match(/SOCIAL_SUMMARY:\s*([^\n]+)/i) || [])[1] || '';
-  const pracSum  = (clean.match(/PRACTICALITY_SUMMARY:\s*([^\n]+)/i) || [])[1] || '';
+  // Stop story before any summary keyword regardless of exact wording
+  const story = (clean.match(
+    /STORY:\s*([\s\S]*?)(?=\n+(?:ENV|SOCIAL|PRACTICALITY)[^\n]*SUMMARY:)/i
+  ) || clean.match(/STORY:\s*([\s\S]*)/i) || [])[1] || '';
+  // Match any variant the LLM uses for each summary key
+  const envSum  = (clean.match(/ENV(?:IRONMENTAL)?[_\s](?:IMPACT[_\s])?SUMMARY:\s*([^\n]+)/i) || [])[1] || '';
+  const socSum  = (clean.match(/SOCIAL[_\s](?:IMPACT[_\s])?SUMMARY:\s*([^\n]+)/i) || [])[1] || '';
+  const pracSum = (clean.match(/PRACTICALITY[_\s](?:\w+[_\s])?SUMMARY:\s*([^\n]+)/i) || [])[1] || '';
   return {
-    story:                 story.trim(),
-    envSummary:            envSum.trim(),
-    socialSummary:         socSum.trim(),
-    practicalitySummary:   pracSum.trim(),
+    story:               story.trim(),
+    envSummary:          envSum.trim(),
+    socialSummary:       socSum.trim(),
+    practicalitySummary: pracSum.trim(),
   };
 }
 
 /* ============================================================
    RECEIPT RENDERING
    ============================================================ */
-function makeImpactDial(score, label) {
-  const r = 26, cx = 36, cy = 36;
+function scoreColor(score) {
+  return score <= 3 ? '#cc2222' : score <= 6 ? '#b88000' : '#1a7a3a';
+}
+
+function makeImpactDial(score) {
+  const size = 56, cx = 28, cy = 28, r = 22;
   const circ = 2 * Math.PI * r;
-  const maxArc = circ * 0.82;
-  const fillArc = Math.max(0, (score / 10) * maxArc);
-  const dashOffset = circ * 0.1;
-  const col = score <= 3 ? '#cc2222' : score <= 6 ? '#b88000' : '#1a7a3a';
-  return `<div class="r-impact-item">
-    <svg width="72" height="72" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#c8bfb0" stroke-width="4"
-        stroke-dasharray="${maxArc} ${circ - maxArc}"
-        stroke-dashoffset="${dashOffset}"
-        stroke-linecap="round"
-        transform="rotate(-90 ${cx} ${cy})"/>
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${col}" stroke-width="4"
-        stroke-dasharray="${fillArc} ${circ - fillArc}"
-        stroke-dashoffset="${dashOffset}"
-        stroke-linecap="round"
-        transform="rotate(-90 ${cx} ${cy})"/>
-      <text x="${cx}" y="${cy + 6}" text-anchor="middle" font-size="18" font-weight="bold"
-        font-family="Courier New" fill="${col}">${score}</text>
-    </svg>
-    <div class="r-impact-label">${label}</div>
+  const maxArc   = circ * 0.82;
+  const fillArc  = Math.max(0, (score / 10) * maxArc);
+  const dashOff  = circ * 0.1;
+  const col = scoreColor(score);
+  return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#c8bfb0" stroke-width="3.5"
+      stroke-dasharray="${maxArc} ${circ - maxArc}" stroke-dashoffset="${dashOff}"
+      stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${col}" stroke-width="3.5"
+      stroke-dasharray="${fillArc} ${circ - fillArc}" stroke-dashoffset="${dashOff}"
+      stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})"/>
+    <text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="14" font-weight="bold"
+      font-family="Courier New" fill="${col}">${score}</text>
+  </svg>`;
+}
+
+function makeScoreBlock(title, score, summary) {
+  const col = scoreColor(score);
+  return `<div class="r-score-block">
+    <div class="r-score-dial">${makeImpactDial(score)}</div>
+    <div class="r-score-text">
+      <div class="r-score-header">
+        <span class="r-score-title">${title}</span>
+        <span class="r-score-num" style="color:${col};">${score} / 10</span>
+      </div>
+      <div class="r-score-summary">${summary || '—'}</div>
+    </div>
   </div>`;
 }
 
@@ -1518,7 +1524,6 @@ function renderReceipt(data) {
 
     <div class="r-label">COMPANY NAME</div>
     <div class="r-write-line"></div>
-    <div class="r-write-line"></div>
 
     <hr class="r-divider">
 
@@ -1535,24 +1540,9 @@ function renderReceipt(data) {
 
     <hr class="r-divider">
 
-    <div class="r-impact-row">
-      ${makeImpactDial(env,  'ENV')}
-      ${makeImpactDial(soc,  'SOCIAL')}
-      ${makeImpactDial(prac, 'PRACTICAL')}
-    </div>
-
-    <div style="margin-top:6px;">
-      <div class="r-label">ENVIRONMENTAL IMPACT</div>
-      <div class="r-impact-summary">${data.envSummary || '—'}</div>
-    </div>
-    <div style="margin-top:6px;">
-      <div class="r-label">SOCIAL IMPACT</div>
-      <div class="r-impact-summary">${data.socialSummary || '—'}</div>
-    </div>
-    <div style="margin-top:6px;">
-      <div class="r-label">PRACTICALITY / SUSTAINABILITY</div>
-      <div class="r-impact-summary">${data.practicalitySummary || '—'}</div>
-    </div>
+    ${makeScoreBlock('ENVIRONMENTAL IMPACT', env,  data.envSummary)}
+    ${makeScoreBlock('SOCIAL IMPACT',        soc,  data.socialSummary)}
+    ${makeScoreBlock('PRACTICALITY',         prac, data.practicalitySummary)}
 
     <hr class="r-divider">
 
