@@ -50,15 +50,23 @@ Use pins **1, 2, 3** — not the primed variants (1′, 2′, 3′) that may als
 | Pin 2 (middle / wiper) | A4          |
 | Pin 3 (right)          | 5V          |
 
-**Rotary knob (A0 → current stage)**
+**Rotary knob 1 (A0 → left control on each screen)**
 
 Looking at the flat face of the potentiometer with the shaft pointing away from you, the pins left to right are:
 
-| Knob pin | Arduino pin |
-|----------|-------------|
-| Left | GND |
-| Middle (wiper) | A0 |
-| Right | 5V |
+| Knob 1 pin     | Arduino pin |
+|----------------|-------------|
+| Left           | GND         |
+| Middle (wiper) | A0          |
+| Right          | 5V          |
+
+**Rotary knob 2 (A1 → right control on each screen)**
+
+| Knob 2 pin     | Arduino pin |
+|----------------|-------------|
+| Left           | GND         |
+| Middle (wiper) | A1          |
+| Right          | 5V          |
 
 ### Arduino sketch
 
@@ -70,14 +78,44 @@ void setup() {
 }
 
 void loop() {
-  int knob   = analogRead(A0);
-  int slider = analogRead(A4);
-  Serial.print(knob);
+  Serial.print(analogRead(A0));
   Serial.print(",");
-  Serial.println(slider);
+  Serial.print(analogRead(A1));
+  Serial.print(",");
+  Serial.println(analogRead(A4));
   delay(50);
 }
 ```
+
+### Thermal printer
+
+The receipt output can be printed on an Adafruit-style 58mm thermal printer connected to the Arduino via a software serial connection.
+
+#### Power (DC IN socket)
+
+Do **not** power the printer from the Arduino's 5V pin — it draws too much current during printing and will brown out the board. Use a separate 5V 2A supply (e.g. a USB wall adapter with a 2.1mm barrel jack and terminal block adapter).
+
+| Printer power wire | External power supply |
+|--------------------|-----------------------|
+| Red                | 5V (+)                |
+| Black              | GND (−)               |
+
+#### Connect the grounds together
+
+External GND ──┬── Printer power GND
+               └── Arduino GND
+
+#### Data (3-pin data socket)
+
+Wire colours vary between batches — check yours. Typically:
+
+| Printer wire           | Arduino Mega pin                    |
+|------------------------|-------------------------------------|
+| GND (usually black)    | GND                                 |
+| TX  (usually green)    | Pin 5 (this is the Arduino's RX)    |
+| RX  (usually yellow)   | Pin 6 (this is the Arduino's TX)    |
+
+---
 
 ### Connecting
 
@@ -92,23 +130,35 @@ Close the Arduino IDE's Serial Monitor before running — it will block the port
 
 ---
 
-## The 7 Stages
+## The 3 Screens
 
-| # | Stage | Control | LLM? |
-|---|-------|---------|------|
-| 1 | **Company Function** — what does it do? | Slider (7 positions, unlabelled) | Live — generates on every move |
-| 2 | **Company Name** — what is it called? | Slider (7 positions, unlabelled) | Live — generates on every move |
-| 3 | **Business Model** — how is it funded? | Rotary knob (4 options) | Batched on stage load |
-| 4 | **Data Type** — what does it learn from? | Rotary knob (4 options) | Batched on stage load |
-| 5 | **Data Acquisition** — how was data obtained? | Rotary knob (4 options) | Batched on stage load |
-| 6 | **Model Size** — how large is the model? | Slider (5 labelled positions: 1B–32B) | Static descriptions |
-| 7 | **Model Hosting** — where does it run? | Rotary knob (4 options) | Static descriptions |
+Each screen shows two rotary knobs (top row) and one slider (bottom row). All three descriptions are visible at once. Turn the knobs or move the slider to change the selection.
 
-**Stage 1 (Company Function):** Moving the slider left produces more ethical, socially beneficial company concepts. Moving right produces more commercially aggressive or ethically questionable ones. This is not labelled anywhere in the UI — you discover the pattern by exploring.
+### Screen 1 — Who Are You?
 
-**Stages 3–5:** When you arrive at a knob stage, the app makes one Ollama call to generate contextual descriptions for all 4 options at once, specific to your company. Turning the knob shows cached results instantly with no further LLM calls.
+| Control | Hardware | Options |
+|---------|----------|---------|
+| Org Type | Knob 1 (A0) | NGO / Non-profit, Gov / Public, Private startup, Big Tech |
+| Funding | Knob 2 (A1) | Govt grants, Subscription, Venture capital, Corp sponsor |
+| Ethical Framework | Slider (A4) | Open ethics → Harm-tolerant (5 positions) |
 
-You can press **[ GENERATE ]** at any time to skip ahead with whatever choices are currently set.
+### Screen 2 — Your Data
+
+| Control | Hardware | Options |
+|---------|----------|---------|
+| Data Types | Knob 1 (A0) | General web, Books / Academic, Proprietary client, Social media |
+| Data Use | Knob 2 (A1) | Internal research, Product features, Sold to third parties, Open source |
+| Data Source | Slider (A4) | Open datasets → Synthetic (5 positions) |
+
+### Screen 3 — Your Model
+
+| Control | Hardware | Options |
+|---------|----------|---------|
+| Model Location | Knob 1 (A0) | Cloud, On-premise, Edge device, Decentralised |
+| System Prompt | Knob 2 (A1) | Open / transparent, Lightly guided, Commercially optimised, Restricted |
+| Model Size | Slider (A4) | 1B → 140B (5 positions, labelled) |
+
+Press **GENERATE** on screen 3 to produce the receipt.
 
 ---
 
@@ -116,11 +166,22 @@ You can press **[ GENERATE ]** at any time to skip ahead with whatever choices a
 
 After generation, the output appears as a thermal printer receipt containing:
 
-- Your company specs (name, function, funding, data, model)
-- The generated mission statement
-- A 3–4 sentence speculative narrative of the company's arc
-- Two impact dials: **Societal Impact** and **Environmental Impact** (scored 1–10)
-- A one-sentence **Risk Factor** note on how it most likely fails or causes harm
+- A blank **Company Name** field (for the user to write on the printed receipt)
+- Your full spec summary (org, ethics, funding, data, model)
+- Three impact dials: **Environmental**, **Social**, and **Practicality/Sustainability** (each scored 1–10, computed from `scores.csv`)
+- A 15–20 word summary beneath each dial explaining the score
+- A 3–4 sentence **speculative narrative** of the organisation's arc
+- A blank **Your Response** field (for the user to write on the printed receipt)
+
+### Tuning the scores
+
+Open `scores.csv` to adjust how each choice affects the three scores. Each row covers one option of one control. Scores are integers 1–10.
+
+```
+control,option_index,option_label,env_score,social_score,practicality_score
+s1_knob1,0,NGO / Non-profit,7,9,4
+...
+```
 
 ---
 
@@ -132,12 +193,14 @@ Open `app.py` and edit the top:
 GENERATION_MODEL = "llama3.2:3b"  # change this
 ```
 
-A faster model (`llama3.2:1b`) makes Stage 1 and 2 more responsive. A larger model (`llama3.2:latest`, `qwen2.5:7b`) produces better analysis in the final receipt.
+A larger model (`llama3.2:latest`, `qwen2.5:7b`) produces better analysis in the final receipt.
 
 ---
 
 ## Architecture
 
-- `app.py` — Flask backend, 4 streaming API endpoints, serves `index.html`
+- `app.py` — Flask backend, `/api/knob` + `/api/generate` endpoints, CSV score loader, serves `index.html`
+- `scores.csv` — Scoring weights for all 9 controls × 3 dimensions
+- `index.html` — Complete single-file frontend: all HTML, CSS, JS inline
 - `index.html` — Complete single-file frontend: all HTML, CSS, and JS inline
 - No build step. No npm. No frameworks.

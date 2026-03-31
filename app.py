@@ -1,3 +1,4 @@
+import csv
 import json
 import os
 import threading
@@ -15,16 +16,19 @@ from flask import Flask, Response, request, send_file, stream_with_context
 
 app = Flask(__name__)
 
-# ── Arduino serial knob ───────────────────────────────────────────────────────
+# ── Arduino serial ────────────────────────────────────────────────────────────
 SERIAL_PORT = "/dev/cu.usbserial-10"
 SERIAL_BAUD = 9600
 _knob_value    = 512   # A0 smoothed
+_knob2_value   = 512   # A1 smoothed
 _slider_value  = 512   # A4 smoothed
-_knob_raw      = 512   # A0 last raw reading
-_slider_raw    = 512   # A4 last raw reading
+_knob_raw      = 512
+_knob2_raw     = 512
+_slider_raw    = 512
 _knob_smooth   = 512.0
+_knob2_smooth  = 512.0
 _slider_smooth = 512.0
-SMOOTH_ALPHA   = 0.25  # lower = smoother but slower
+SMOOTH_ALPHA   = 0.25
 _serial_lock   = threading.Lock()
 
 
@@ -39,7 +43,9 @@ def _find_arduino_port():
 
 
 def _serial_reader():
-    global _knob_value, _slider_value, _knob_raw, _slider_raw, _knob_smooth, _slider_smooth
+    global _knob_value, _knob2_value, _slider_value
+    global _knob_raw, _knob2_raw, _slider_raw
+    global _knob_smooth, _knob2_smooth, _slider_smooth
     if not _SERIAL_AVAILABLE:
         return
     port = SERIAL_PORT or _find_arduino_port()
@@ -50,25 +56,29 @@ def _serial_reader():
     while True:
         try:
             with serial.Serial(port, SERIAL_BAUD, timeout=2) as ser:
-                ser.reset_input_buffer()  # discard stale/partial data on connect
+                ser.reset_input_buffer()
                 print(f"[SERIAL] Connected.")
                 while True:
                     try:
                         line = ser.readline().decode("utf-8", errors="ignore").strip()
                     except OSError:
-                        continue  # transient USB-serial artefact — don't reconnect
+                        continue  # transient USB-serial artefact
                     parts = line.split(",")
-                    if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
-                        k = int(parts[0])
-                        s = int(parts[1])
-                        if not (0 <= k <= 1023 and 0 <= s <= 1023):
-                            continue  # discard corrupted/concatenated readings
+                    if len(parts) == 3 and all(p.isdigit() for p in parts):
+                        k1 = int(parts[0])
+                        k2 = int(parts[1])
+                        s  = int(parts[2])
+                        if not (0 <= k1 <= 1023 and 0 <= k2 <= 1023 and 0 <= s <= 1023):
+                            continue  # discard corrupted readings
                         with _serial_lock:
-                            _knob_raw      = k
+                            _knob_raw      = k1
+                            _knob2_raw     = k2
                             _slider_raw    = s
-                            _knob_smooth   = SMOOTH_ALPHA * k + (1 - SMOOTH_ALPHA) * _knob_smooth
-                            _slider_smooth = SMOOTH_ALPHA * s + (1 - SMOOTH_ALPHA) * _slider_smooth
+                            _knob_smooth   = SMOOTH_ALPHA * k1 + (1 - SMOOTH_ALPHA) * _knob_smooth
+                            _knob2_smooth  = SMOOTH_ALPHA * k2 + (1 - SMOOTH_ALPHA) * _knob2_smooth
+                            _slider_smooth = SMOOTH_ALPHA * s  + (1 - SMOOTH_ALPHA) * _slider_smooth
                             _knob_value    = round(_knob_smooth)
+                            _knob2_value   = round(_knob2_smooth)
                             _slider_value  = round(_slider_smooth)
         except Exception as e:
             print(f"[SERIAL] Error: {e} — retrying in 3s")
@@ -81,42 +91,47 @@ threading.Thread(target=_serial_reader, daemon=True).start()
 OLLAMA_URL = "http://localhost:11434/api/generate"
 GENERATION_MODEL = "llama3.2:3b"   # change this to use a different model
 
-INDEX_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
+INDEX_PATH  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
+SCORES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scores.csv")
 
-# Ethical tone strings mapped to slider positions 1-7
-ETHICAL_TONES = {
-    1: (
-        "The company is deeply ethical and idealistic. It exists to serve a marginalised "
-        "community or address a genuine social/environmental crisis. Its mission statement "
-        "should sound sincere, humble, and focused on collective good."
-    ),
-    2: (
-        "The company is well-intentioned with a clear social purpose. Mostly ethical with "
-        "some pragmatic business language. Genuine but realistic."
-    ),
-    3: (
-        "The company is a social enterprise — trying to do good but also needs to be "
-        "sustainable. Mix of idealism and business pragmatism."
-    ),
-    4: (
-        "The company is a standard tech startup. Neutral corporate tone. Talks about "
-        "innovation, disruption, and market opportunity. Ethics mentioned vaguely if at all."
-    ),
-    5: (
-        "The company is commercially aggressive. Focused on growth, scale, data extraction, "
-        "and market dominance. Ethics are PR dressing."
-    ),
-    6: (
-        "The company is ethically dubious. It does something that sounds useful but has "
-        "clear potential for exploitation, surveillance, or harm. The mission statement "
-        "tries to spin this positively."
-    ),
-    7: (
-        "The company is actively harmful but disguised in positive corporate language. "
-        "Think surveillance tech sold as safety, or extraction sold as empowerment. "
-        "The mission statement sounds inspiring but is sinister if you read carefully."
-    ),
-}
+# ── Load scoring CSV ──────────────────────────────────────────────────────────
+_scores = {}
+
+
+def _load_scores():
+    global _scores
+    if not os.path.exists(SCORES_PATH):
+        print(f"[SCORES] {SCORES_PATH} not found — all scores default to 5")
+        return
+    with open(SCORES_PATH, newline='') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            key = (row['control'], int(row['option_index']))
+            _scores[key] = {
+                'env':          int(row['env_score']),
+                'social':       int(row['social_score']),
+                'practicality': int(row['practicality_score']),
+            }
+    print(f"[SCORES] Loaded {len(_scores)} entries from scores.csv")
+
+
+_load_scores()
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def compute_scores(choices):
+    envs, socs, pracs = [], [], []
+    for ctrl, idx in choices:
+        s = _scores.get((ctrl, idx), {'env': 5, 'social': 5, 'practicality': 5})
+        envs.append(s['env'])
+        socs.append(s['social'])
+        pracs.append(s['practicality'])
+    if not envs:
+        return 5, 5, 5
+    env  = max(1, min(10, round(sum(envs) / len(envs))))
+    soc  = max(1, min(10, round(sum(socs) / len(socs))))
+    prac = max(1, min(10, round(sum(pracs) / len(pracs))))
+    return env, soc, prac
 
 
 def stream_ollama(prompt, num_predict=150, temperature=0.85):
@@ -170,142 +185,74 @@ def knob():
     with _serial_lock:
         return {
             "knob":       _knob_value,
+            "knob2":      _knob2_value,
             "slider":     _slider_value,
             "knob_raw":   _knob_raw,
+            "knob2_raw":  _knob2_raw,
             "slider_raw": _slider_raw,
         }
-
-
-@app.route("/api/company-function", methods=["POST"])
-def company_function():
-    data = request.get_json()
-    position = max(1, min(7, int(data.get("position", 4))))
-    tone = ETHICAL_TONES[position]
-
-    prompt = (
-        "Generate a short description of a fictional AI company. Include:\n"
-        "1. What the company does (one sentence, max 20 words, specific and concrete)\n"
-        "2. A mission statement / manifesto for the company (2 sentences maximum)\n\n"
-        f"Ethical tone: {tone}\n\n"
-        "Generate something different from previous responses. Be creative and specific.\n"
-        "Do NOT invent a company name.\n\n"
-        "Respond in EXACTLY this format, nothing else:\n"
-        "FUNCTION: [what the company does]\n"
-        "MISSION: [the mission statement / manifesto]"
-    )
-
-    return streamed(stream_ollama(prompt, num_predict=100, temperature=0.92))
-
-
-@app.route("/api/company-name", methods=["POST"])
-def company_name():
-    data = request.get_json()
-    company_function = data.get("company_function", "an AI company")
-    previous_names = data.get("previous_names", [])
-
-    avoid = ""
-    if previous_names:
-        avoid = f"\nGenerate a completely different name from: {', '.join(previous_names)}"
-
-    prompt = (
-        f'Generate a single company name for a fictional AI company that does the following:\n'
-        f'"{company_function}"\n\n'
-        "The name should feel like a real tech company name — it can be a made-up word, "
-        "an acronym, a portmanteau, or a real word used cleverly.\n"
-        "Just the name, nothing else. No quotes, no explanation, no punctuation."
-        f"{avoid}"
-    )
-
-    return streamed(stream_ollama(prompt, num_predict=15, temperature=0.95))
-
-
-@app.route("/api/describe", methods=["POST"])
-def describe():
-    data = request.get_json()
-    company_name = data.get("company_name", "the company")
-    company_function = data.get("company_function", "an AI service")
-    stage = data.get("stage", "business_model")
-    data_type = data.get("data_type", "")
-
-    if stage == "business_model":
-        prompt = (
-            f'An AI company called "{company_name}" does the following: "{company_function}"\n\n'
-            "For each of the following funding models, write one sentence only (max 20 words) "
-            "on what it would specifically mean for this company — who has power and what "
-            "compromises might be made.\n\n"
-            "Respond in EXACTLY this format:\n"
-            "GOVT_GRANTS: [explanation]\n"
-            "PAY_TO_PLAY: [explanation]\n"
-            "BIG_LOAN: [explanation]\n"
-            "RICH_DONOR: [explanation]"
-        )
-    elif stage == "data_type":
-        prompt = (
-            f'An AI company called "{company_name}" does the following: "{company_function}"\n\n'
-            "For each of the following training data types, write one sentence only (max 20 words) "
-            "on what this data would mean for this specific company.\n\n"
-            "Respond in EXACTLY this format:\n"
-            "GENERAL_WEB: [explanation]\n"
-            "BOOKS_ACADEMIC: [explanation]\n"
-            "PROPRIETARY_CLIENT: [explanation]\n"
-            "SOCIAL_MEDIA: [explanation]"
-        )
-    elif stage == "data_acquisition":
-        data_type_label = data_type or "general"
-        prompt = (
-            f'An AI company called "{company_name}" does the following: "{company_function}". '
-            f"It trains its model on {data_type_label} data.\n\n"
-            "For each of the following data acquisition methods, write one sentence only "
-            "(max 20 words) on what this would mean for this company.\n\n"
-            "Respond in EXACTLY this format:\n"
-            "SCRAPED: [explanation]\n"
-            "LICENSED: [explanation]\n"
-            "CROWDSOURCED: [explanation]\n"
-            "SYNTHETIC: [explanation]"
-        )
-    else:
-        return streamed(iter(["Unknown stage"]))
-
-    return streamed(stream_ollama(prompt, num_predict=130, temperature=0.8))
 
 
 @app.route("/api/generate", methods=["POST"])
 def generate():
     data = request.get_json()
-    name = data.get("company_name", "Unnamed Corp")
-    function = data.get("company_function", "an AI company")
-    mission = data.get("mission_statement", "")
-    business_model = data.get("business_model", "unknown")
-    data_type = data.get("data_type", "unknown")
-    acquisition = data.get("data_acquisition", "unknown")
-    model_size = data.get("model_size", "7B")
-    hosting = data.get("hosting", "cloud")
+
+    # Labels for human-readable prompt
+    org_type   = data.get("org_type",   "Unknown")
+    ethical    = data.get("ethical",    "Unknown")
+    funding    = data.get("funding",    "Unknown")
+    data_types = data.get("data_types", "Unknown")
+    data_src   = data.get("data_source","Unknown")
+    data_use   = data.get("data_use",   "Unknown")
+    model_size = data.get("model_size", "Unknown")
+    model_loc  = data.get("model_location", "Unknown")
+    sys_prompt = data.get("system_prompt",  "Unknown")
+
+    # Indices for score lookup
+    choices = [
+        ("s1_knob1", data.get("org_type_idx",   0)),
+        ("s1_slider", data.get("ethical_idx",   2)),
+        ("s1_knob2",  data.get("funding_idx",   0)),
+        ("s2_knob1",  data.get("data_types_idx",0)),
+        ("s2_slider", data.get("data_source_idx",2)),
+        ("s2_knob2",  data.get("data_use_idx",  0)),
+        ("s3_slider", data.get("model_size_idx",2)),
+        ("s3_knob1",  data.get("model_location_idx",0)),
+        ("s3_knob2",  data.get("system_prompt_idx",0)),
+    ]
+    env_score, social_score, prac_score = compute_scores(choices)
 
     prompt = (
-        "You are a speculative fiction analyst examining a fictional AI company. "
-        "Based on the following design choices, write a brief critical analysis.\n\n"
-        f"COMPANY NAME: {name}\n"
-        f"COMPANY FUNCTION: {function}\n"
-        f'MISSION: "{mission}"\n'
-        f"BUSINESS MODEL: {business_model}\n"
-        f"DATA TYPE: {data_type}\n"
-        f"DATA ACQUISITION: {acquisition}\n"
+        "You are a speculative fiction analyst. Based on these AI organisation design choices, "
+        "write a brief critical analysis.\n\n"
+        f"ORG TYPE: {org_type}\n"
+        f"ETHICAL FRAMEWORK: {ethical}\n"
+        f"FUNDING: {funding}\n"
+        f"DATA TYPES: {data_types}\n"
+        f"DATA SOURCE: {data_src}\n"
+        f"DATA USE: {data_use}\n"
         f"MODEL SIZE: {model_size}\n"
-        f"HOSTING: {hosting}\n\n"
-        "Respond with EXACTLY this format (keep each section very concise):\n\n"
+        f"MODEL LOCATION: {model_loc}\n"
+        f"SYSTEM PROMPT STYLE: {sys_prompt}\n\n"
+        "Pre-computed scores (do not change these numbers — write summaries that explain them):\n"
+        f"  Environmental impact: {env_score}/10\n"
+        f"  Social impact: {social_score}/10\n"
+        f"  Practicality/sustainability: {prac_score}/10\n\n"
+        "Respond in EXACTLY this format:\n\n"
         "STORY:\n"
-        "[Write a 3-4 sentence speculative narrative of this company's trajectory — its "
-        "founding, its peak, and its end. If the company is likely to fail, say so. If it "
-        "would cause tangible harm, describe it plainly. If it could do genuine good, say "
-        "that too. Be specific to the choices made. Do not be preachy — be matter-of-fact.]\n\n"
-        "SOCIETAL_IMPACT: [a single integer from 1-10, where 1 = deeply harmful, 10 = profoundly beneficial]\n\n"
-        "ENVIRONMENTAL_IMPACT: [a single integer from 1-10, where 1 = devastating damage, 10 = actively regenerative]\n\n"
-        "FAILURE_NOTE:\n"
-        "[One sentence on the most likely way this company fails or causes harm, linking it "
-        "to a specific design choice made above.]"
+        "[3-4 sentence speculative narrative of this organisation's arc — its founding, its peak, "
+        "and most likely end. Be specific to the choices made. Be matter-of-fact, not preachy.]\n\n"
+        f"ENV_SUMMARY: [15-20 words explaining the {env_score}/10 environmental impact score]\n\n"
+        f"SOCIAL_SUMMARY: [15-20 words explaining the {social_score}/10 social impact score]\n\n"
+        f"PRACTICALITY_SUMMARY: [15-20 words explaining the {prac_score}/10 practicality score]"
     )
 
-    return streamed(stream_ollama(prompt, num_predict=450, temperature=0.7))
+    def gen_with_scores():
+        # Emit scores header first so the frontend can extract them synchronously
+        yield f"__SCORES__:{env_score},{social_score},{prac_score}\n"
+        yield from stream_ollama(prompt, num_predict=450, temperature=0.7)
+
+    return streamed(gen_with_scores())
 
 
 if __name__ == "__main__":
