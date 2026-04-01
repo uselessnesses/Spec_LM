@@ -40,6 +40,7 @@ html, body {
   font-size: 14px;
   line-height: 1.5;
   overflow: hidden;
+  user-select: text;
 }
 
 /* ============================================================
@@ -372,16 +373,27 @@ html, body {
 .r-score-dial   { flex-shrink: 0; }
 .r-score-text   { flex: 1; min-width: 0; }
 .r-score-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
-.r-score-title  { font-size: 10px; letter-spacing: 1px; color: #666; font-weight: bold; }
-.r-score-num    { font-size: 14px; font-weight: bold; white-space: nowrap; }
-.r-score-summary{ font-size: 10px; color: #444; line-height: 1.55; font-style: italic; }
+.r-score-title  { font-size: 13px; letter-spacing: 1px; color: #444; font-weight: bold; }
+.r-score-num    { font-size: 16px; font-weight: bold; white-space: nowrap; }
+.r-score-summary{ font-size: 12px; color: #333; line-height: 1.6; font-style: italic; }
 .r-write-line {
   border-bottom: 1px dashed #b0a898;
   height: 22px;
   margin-bottom: 4px;
 }
+.r-write-line-lg {
+  border-bottom: 1px dashed #b0a898;
+  height: 36px;
+  margin-bottom: 6px;
+}
 
-#start-over-btn {
+#receipt-actions {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+#start-over-btn, #save-btn, #print-btn {
   font-family: var(--font);
   font-size: 11px;
   letter-spacing: 2px;
@@ -394,7 +406,11 @@ html, body {
   transition: all 0.15s;
   flex-shrink: 0;
 }
-#start-over-btn:hover { color: var(--text); border-color: var(--dim); }
+#start-over-btn:hover, #save-btn:hover, #print-btn:hover { color: var(--text); border-color: var(--dim); }
+#save-btn  { color: var(--accent); border-color: var(--accent); }
+#save-btn:hover  { background: var(--glow); }
+#save-btn:disabled, #print-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+#print-btn { color: var(--accent); border-color: var(--accent); }
 
 /* ============================================================
    NAV BAR
@@ -485,6 +501,96 @@ html, body {
 /* ============================================================
    DEBUG OVERLAY
    ============================================================ */
+#serial-indicator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+#serial-dot { font-size: 8px; color: var(--dim); }
+#serial-indicator.connected #serial-dot  { color: var(--accent); }
+#serial-indicator.connected #serial-label { color: var(--accent); }
+#serial-indicator.error #serial-dot   { color: var(--red); }
+#serial-indicator.error #serial-label { color: var(--red); }
+#serial-indicator { cursor: pointer; }
+#serial-indicator:hover #serial-label { text-decoration: underline; }
+
+/* ============================================================
+   PORT PICKER MODAL
+   ============================================================ */
+#port-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(10,10,10,0.88);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+#port-modal.active { display: flex; }
+#port-modal-inner {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  padding: 24px;
+  width: 440px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: var(--font);
+}
+#port-modal-title {
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--dim);
+  margin-bottom: 4px;
+}
+#port-list { display: flex; flex-direction: column; gap: 6px; }
+#port-list-empty {
+  font-size: 11px;
+  color: var(--dim);
+  letter-spacing: 1px;
+  padding: 10px 0;
+}
+.port-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.port-row:hover { border-color: var(--accent); background: rgba(255,255,255,0.03); }
+.port-row.likely { border-color: var(--border2); }
+.port-device { font-size: 13px; color: var(--accent); letter-spacing: 1px; }
+.port-desc   { font-size: 11px; color: var(--dim); }
+.port-badge  { font-size: 9px; letter-spacing: 2px; color: var(--accent); margin-top: 2px; }
+#port-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+#port-modal-note { font-size: 10px; color: var(--dim); letter-spacing: 0.5px; }
+#port-modal-close {
+  font-family: var(--font);
+  font-size: 11px;
+  letter-spacing: 2px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--dim);
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+#port-modal-close:hover { border-color: var(--accent); color: var(--text); }
+
 #debug-overlay {
   position: fixed;
   bottom: 60px;
@@ -524,6 +630,10 @@ html, body {
   <div id="status-bar">
     <div id="app-title">BUILD YOUR SPECULATIVE AI COMPANY</div>
     <div id="progress-bar"></div>
+    <div id="serial-indicator" title="Arduino connection status">
+      <span id="serial-dot">&#9679;</span>
+      <span id="serial-label">NO DEVICE</span>
+    </div>
   </div>
 
   <!-- SCREEN CONTAINER -->
@@ -628,7 +738,11 @@ html, body {
           <div class="receipt-edge bottom"></div>
         </div>
       </div>
-      <button id="start-over-btn">&#8617; START OVER</button>
+      <div id="receipt-actions">
+        <button id="print-btn" disabled>&#9113; PRINT</button>
+        <button id="save-btn">&#8595; SAVE AS PNG</button>
+        <button id="start-over-btn">&#8617; START OVER</button>
+      </div>
     </div>
 
   </div><!-- /screen-container -->
@@ -646,6 +760,7 @@ html, body {
   <div>K1  raw:<span id="dbg-k1-raw">—</span> smooth:<span id="dbg-k1-sm">—</span> &rarr; <span id="dbg-k1-idx">—</span></div>
   <div>K2  raw:<span id="dbg-k2-raw">—</span> smooth:<span id="dbg-k2-sm">—</span> &rarr; <span id="dbg-k2-idx">—</span></div>
   <div>SL  raw:<span id="dbg-sl-raw">—</span> smooth:<span id="dbg-sl-sm">—</span> &rarr; <span id="dbg-sl-idx">—</span></div>
+  <div>RX  <span id="dbg-last-line">—</span></div>
 </div>
 
 <!-- Generating overlay -->
@@ -657,6 +772,7 @@ html, body {
   <div class="gen-story" id="gen-story"></div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
 /* ============================================================
    ROTARY DIAL CLASS
@@ -1084,12 +1200,12 @@ const CTRL = {
     ],
   },
   DATA_USE: {
-    names: ['INTERNAL RESEARCH', 'PRODUCT FEATURES', 'SOLD TO THIRD PARTIES', 'OPEN SOURCE'],
+    names: ['UNSUPERVISED', 'HUMAN FEEDBACK', 'RULE-BASED', 'FINE-TUNED'],
     descs: [
-      'Data is used only to develop and improve internal models. Never shared or deployed externally.',
-      'Data trains models that power a deployed product. Users interact with outputs shaped by this data.',
-      'Processed data or model outputs are sold commercially. Original data subjects may not know their data has been monetised.',
-      'Model and training data released publicly. Enables scrutiny and community use, but lowers barriers to misuse.',
+      'Model learns patterns from raw data without human guidance. Scalable and cheap, but unpredictable — the model develops its own internal representations with no external correction.',
+      'Human raters score or rank model outputs, which are used to steer behaviour. More aligned with human values, but expensive and shaped by who the raters are.',
+      'Explicit rules, constitutions, or principles constrain what the model can and cannot do. Predictable and auditable, but rigid — may fail at edge cases the rules didn\'t anticipate.',
+      'A general model is retrained on a narrow, curated dataset for a specific task. Highly capable within its domain, but brittle outside it and dependent on dataset quality.',
     ],
   },
 
@@ -1498,7 +1614,10 @@ function makeScoreBlock(title, score, summary) {
   </div>`;
 }
 
+let _receiptData = null;
+
 function renderReceipt(data) {
+  _receiptData = { ...data };
   const body = document.getElementById('receipt-body');
 
   // Spec summary lines
@@ -1552,10 +1671,12 @@ function renderReceipt(data) {
     <hr class="r-divider">
 
     <div class="r-label" style="margin-bottom:6px;">YOUR RESPONSE</div>
-    <div class="r-write-line"></div>
-    <div class="r-write-line"></div>
-    <div class="r-write-line"></div>
-    <div class="r-write-line"></div>
+    <div class="r-write-line-lg"></div>
+    <div class="r-write-line-lg"></div>
+    <div class="r-write-line-lg"></div>
+    <div class="r-write-line-lg"></div>
+    <div class="r-write-line-lg"></div>
+    <div class="r-write-line-lg"></div>
 
     <hr class="r-divider-d">
 
@@ -1579,6 +1700,10 @@ function renderReceipt(data) {
   receipt.addEventListener('transitionend', () => {
     wrap.style.overflow = 'visible';
   }, { once: true });
+
+  // Enable print button now that receipt data is ready
+  const printBtn = document.getElementById('print-btn');
+  if (printBtn) printBtn.disabled = false;
 }
 
 /* ============================================================
@@ -1605,6 +1730,9 @@ function startOver() {
 
   document.getElementById('receipt-body').innerHTML = '';
   document.getElementById('receipt-printer-wrap').style.overflow = 'hidden';
+  _receiptData = null;
+  const printBtn = document.getElementById('print-btn');
+  if (printBtn) { printBtn.disabled = true; printBtn.textContent = '\u2399 PRINT'; }
 
   _lastK1Idx = -1; _lastK2Idx = -1; _lastSlIdx = -1;
   _lastK1Raw = -1; _lastK2Raw = -1; _lastSlRaw = -1;
@@ -1627,15 +1755,103 @@ function mapToIndex(raw, positions) {
   return Math.round((raw / 1023) * (positions - 1));
 }
 
+/* ============================================================
+   PORT PICKER
+   ============================================================ */
+async function openPortPicker() {
+  const modal = document.getElementById('port-modal');
+  const list  = document.getElementById('port-list');
+  list.innerHTML = '<div id="port-list-empty">SCANNING…</div>';
+  modal.classList.add('active');
+
+  try {
+    const r = await fetch('/api/list-ports');
+    const { ports, error } = await r.json();
+
+    if (error || !ports || ports.length === 0) {
+      list.innerHTML = `<div id="port-list-empty">${error ? error.toUpperCase() : 'NO PORTS FOUND'}</div>`;
+      return;
+    }
+
+    list.innerHTML = '';
+    for (const p of ports) {
+      const row = document.createElement('div');
+      row.className = 'port-row' + (p.likely_arduino ? ' likely' : '');
+
+      const dev  = document.createElement('div');
+      dev.className = 'port-device';
+      dev.textContent = p.device;
+
+      const desc = document.createElement('div');
+      desc.className = 'port-desc';
+      desc.textContent = p.description || 'Unknown device';
+
+      row.appendChild(dev);
+      row.appendChild(desc);
+
+      if (p.likely_arduino) {
+        const badge = document.createElement('div');
+        badge.className = 'port-badge';
+        badge.textContent = '◆ LIKELY ARDUINO';
+        row.appendChild(badge);
+      }
+
+      row.addEventListener('click', async () => {
+        modal.classList.remove('active');
+        await fetch('/api/set-port', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ port: p.device }),
+        });
+      });
+
+      list.appendChild(row);
+    }
+  } catch (e) {
+    list.innerHTML = '<div id="port-list-empty">ERROR LOADING PORTS</div>';
+  }
+}
+
+function closePortPicker() {
+  document.getElementById('port-modal').classList.remove('active');
+}
+
+let _serialStatusTimer = null;
+function startSerialStatusPoll() {
+  clearInterval(_serialStatusTimer);
+  _serialStatusTimer = setInterval(async () => {
+    try {
+      const r = await fetch('/api/serial-status');
+      const s = await r.json();
+      const ind   = document.getElementById('serial-indicator');
+      const label = document.getElementById('serial-label');
+      ind.classList.remove('connected', 'error');
+      if (s.connected) {
+        ind.classList.add('connected');
+        label.textContent = s.port ? s.port.replace('/dev/cu.', '').replace('/dev/', '').toUpperCase() : 'CONNECTED';
+      } else if (s.error) {
+        ind.classList.add('error');
+        label.textContent = 'NO DEVICE';
+        ind.title = s.error;
+      } else {
+        label.textContent = 'NO DEVICE';
+        ind.title = 'Arduino not found';
+      }
+      // Show last raw line from serial port in debug overlay
+      const dbgLine = document.getElementById('dbg-last-line');
+      if (dbgLine) dbgLine.textContent = s.last_line || '—';
+    } catch (_) {}
+  }, 2000);
+}
+
 function startKnobPoll() {
   clearInterval(_knobTimer);
   _knobTimer = setInterval(async () => {
-    if (state.screen === 3) return;
     try {
       const r = await fetch('/api/knob');
       const { knob, knob2, slider, knob_raw, knob2_raw, slider_raw } = await r.json();
 
-      // Debug display
+      // Debug display (always updated, even on receipt screen)
       const k1Pos = state.activeKnob1 ? state.activeKnob1.n : '?';
       const k2Pos = state.activeKnob2 ? state.activeKnob2.n : '?';
       const slPos = state.activeSlider ? state.activeSlider.positions : '?';
@@ -1648,6 +1864,9 @@ function startKnobPoll() {
       document.getElementById('dbg-sl-raw').textContent  = slider_raw;
       document.getElementById('dbg-sl-sm').textContent   = slider;
       document.getElementById('dbg-sl-idx').textContent  = state.activeSlider ? mapToIndex(slider, slPos) : '—';
+
+      // UI control updates — skip on receipt screen
+      if (state.screen === 3) return;
 
       // Knob 1 → activeKnob1 (inverted)
       if (state.activeKnob1 && (_lastK1Raw === -1 || Math.abs(knob - _lastK1Raw) >= DEADBAND)) {
@@ -1688,6 +1907,13 @@ function startKnobPoll() {
 document.addEventListener('DOMContentLoaded', () => {
   buildProgressBar();
   startKnobPoll();
+  startSerialStatusPoll();
+
+  document.getElementById('serial-indicator').addEventListener('click', openPortPicker);
+  document.getElementById('port-modal-close').addEventListener('click', closePortPicker);
+  document.getElementById('port-modal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('port-modal')) closePortPicker();
+  });
 
   document.getElementById('back-btn').addEventListener('click', () => {
     if (state.screen > 0) showScreen(state.screen - 1);
@@ -1697,9 +1923,93 @@ document.addEventListener('DOMContentLoaded', () => {
     else showScreen(state.screen + 1);
   });
   document.getElementById('start-over-btn').addEventListener('click', startOver);
+  document.getElementById('save-btn').addEventListener('click', saveReceiptPng);
+  document.getElementById('print-btn').addEventListener('click', printReceipt);
 
   showScreen(0);
 });
+
+/* ============================================================
+   PRINT RECEIPT (thermal printer via Arduino)
+   ============================================================ */
+async function printReceipt() {
+  if (!_receiptData) return;
+  const btn = document.getElementById('print-btn');
+  btn.disabled = true;
+  btn.textContent = '\u2026 PRINTING';
+  try {
+    const payload = {
+      org_type:              CTRL.ORG_TYPE.names[state.orgTypeIdx],
+      ethical:               CTRL.ETHICAL.names[state.ethicalIdx],
+      funding:               CTRL.FUNDING.names[state.fundingIdx],
+      data_types:            CTRL.DATA_TYPES.names[state.dataTypesIdx],
+      data_source:           CTRL.DATA_SOURCE.names[state.dataSourceIdx],
+      data_use:              CTRL.DATA_USE.names[state.dataUseIdx],
+      model_size:            CTRL.MODEL_SIZE.names[state.modelSizeIdx],
+      model_location:        CTRL.MODEL_LOCATION.names[state.modelLocationIdx],
+      system_prompt:         CTRL.SYSTEM_PROMPT.names[state.systemPromptIdx],
+      env_score:             state.envScore,
+      social_score:          state.socialScore,
+      prac_score:            state.pracScore,
+      env_summary:           _receiptData.envSummary           || '',
+      social_summary:        _receiptData.socialSummary        || '',
+      practicality_summary:  _receiptData.practicalitySummary  || '',
+      story:                 _receiptData.story                || '',
+    };
+    const r = await fetch('/api/print', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await r.json();
+    if (!result.ok) alert('Print failed: ' + (result.error || 'unknown error'));
+  } catch (e) {
+    alert('Print failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '\u2399 PRINT';
+  }
+}
+
+/* ============================================================
+   SAVE RECEIPT AS PNG
+   ============================================================ */
+async function saveReceiptPng() {
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true;
+  btn.textContent = '… RENDERING';
+  try {
+    const receipt = document.getElementById('receipt');
+    const canvas  = await html2canvas(receipt, {
+      backgroundColor: '#f5f0e8',
+      scale: 2,            // 2× for sharp print quality
+      useCORS: true,
+      logging: false,
+    });
+    const link = document.createElement('a');
+    link.download = 'speculative-ai-company.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch (e) {
+    console.error('Save failed:', e);
+    alert('Could not save image. Check browser console for details.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '\u2193 SAVE AS PNG';
+  }
+}
 </script>
+
+<!-- PORT PICKER MODAL -->
+<div id="port-modal">
+  <div id="port-modal-inner">
+    <div id="port-modal-title">SELECT SERIAL PORT</div>
+    <div id="port-list"><div id="port-list-empty">SCANNING…</div></div>
+    <div id="port-modal-footer">
+      <span id="port-modal-note">Click a port to connect. Arduino-likely ports shown first.</span>
+      <button id="port-modal-close">CANCEL</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

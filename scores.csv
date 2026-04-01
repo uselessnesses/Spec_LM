@@ -21,10 +21,10 @@ s2_slider,1,Licensed,5,7,8
 s2_slider,2,Scraped,4,3,9
 s2_slider,3,Crowdsourced,5,6,6
 s2_slider,4,Synthetic,7,5,7
-s2_knob2,0,Internal research,6,7,5
-s2_knob2,1,Product features,5,5,8
-s2_knob2,2,Sold to third parties,4,2,9
-s2_knob2,3,Open source release,5,9,4
+s2_knob2,0,Unsupervised,5,5,9
+s2_knob2,1,Human feedback,6,8,6
+s2_knob2,2,Rule-based / constitutional,6,7,7
+s2_knob2,3,Fine-tuned to specific task,5,6,8
 s3_slider,0,1B,9,5,9
 s3_slider,1,7B,7,6,8
 s3_slider,2,14B,5,7,6

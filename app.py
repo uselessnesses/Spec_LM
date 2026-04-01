@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import textwrap
 import threading
 import time
 
@@ -17,7 +18,11 @@ from flask import Flask, Response, request, send_file, stream_with_context
 app = Flask(__name__)
 
 # ── Arduino serial ────────────────────────────────────────────────────────────
-SERIAL_PORT = "/dev/cu.usbserial-10"
+# Set SERIAL_PORT to a specific device path to override auto-detect, e.g.:
+#   SERIAL_PORT = "/dev/cu.usbserial-10"   # macOS
+#   SERIAL_PORT = "COM3"                    # Windows
+# Leave as None to auto-detect.
+SERIAL_PORT = None
 SERIAL_BAUD = 9600
 _knob_value    = 512   # A0 smoothed
 _knob2_value   = 512   # A1 smoothed
@@ -29,40 +34,62 @@ _knob_smooth   = 512.0
 _knob2_smooth  = 512.0
 _slider_smooth = 512.0
 SMOOTH_ALPHA   = 0.25
-_serial_lock   = threading.Lock()
+_serial_lock          = threading.Lock()
+_serial_status        = {"connected": False, "port": None, "error": None, "last_line": ""}
+_user_port_override   = None          # set via /api/set-port
+_serial_restart_event = threading.Event()
+_ser_obj              = None          # active Serial instance, set by _serial_reader
 
 
-def _find_arduino_port():
+def _list_candidate_ports():
+    """Return all likely Arduino ports, sorted by likelihood."""
     if not _SERIAL_AVAILABLE:
-        return None
+        return []
+    candidates = []
     for p in serial.tools.list_ports.comports():
         desc = (p.description + p.hwid).lower()
         if any(k in desc for k in ('arduino', 'usbmodem', 'usbserial', 'ch340', 'cp210')):
-            return p.device
-    return None
+            candidates.append(p.device)
+    return candidates
 
 
 def _serial_reader():
     global _knob_value, _knob2_value, _slider_value
     global _knob_raw, _knob2_raw, _slider_raw
     global _knob_smooth, _knob2_smooth, _slider_smooth
+    global _serial_status, _user_port_override, _ser_obj
     if not _SERIAL_AVAILABLE:
+        _serial_status = {"connected": False, "port": None, "error": "pyserial not installed"}
         return
-    port = SERIAL_PORT or _find_arduino_port()
-    if not port:
-        print("[SERIAL] No Arduino found — knob disabled. Set SERIAL_PORT manually if needed.")
-        return
-    print(f"[SERIAL] Connecting to {port} at {SERIAL_BAUD} baud…")
     while True:
+        # Resolve port: user override → hardcoded → auto-detect
+        port = _user_port_override or SERIAL_PORT
+        if not port:
+            candidates = _list_candidate_ports()
+            port = candidates[0] if candidates else None
+            if candidates:
+                print(f"[SERIAL] Auto-detected ports: {candidates}")
+        if not port:
+            _serial_status = {"connected": False, "port": None,
+                              "error": "No Arduino found. Plug in USB and wait, or click NO DEVICE to pick a port."}
+            print(f"[SERIAL] {_serial_status['error']} Retrying in 3s…")
+            _serial_restart_event.wait(timeout=3)
+            _serial_restart_event.clear()
+            continue
+        print(f"[SERIAL] Connecting to {port} at {SERIAL_BAUD} baud…")
         try:
             with serial.Serial(port, SERIAL_BAUD, timeout=2) as ser:
                 ser.reset_input_buffer()
-                print(f"[SERIAL] Connected.")
+                _ser_obj = ser
+                _serial_status = {"connected": True, "port": port, "error": None}
+                print(f"[SERIAL] Connected on {port}.")
                 while True:
                     try:
                         line = ser.readline().decode("utf-8", errors="ignore").strip()
                     except OSError:
                         continue  # transient USB-serial artefact
+                    if line:
+                        _serial_status["last_line"] = line
                     parts = line.split(",")
                     if len(parts) == 3 and all(p.isdigit() for p in parts):
                         k1 = int(parts[0])
@@ -81,7 +108,9 @@ def _serial_reader():
                             _knob2_value   = round(_knob2_smooth)
                             _slider_value  = round(_slider_smooth)
         except Exception as e:
-            print(f"[SERIAL] Error: {e} — retrying in 3s")
+            _serial_status = {"connected": False, "port": port, "error": str(e)}
+            print(f"[SERIAL] Error on {port}: {e} — retrying in 3s")
+            _ser_obj = None
             time.sleep(3)
 
 
@@ -180,6 +209,11 @@ def index():
     return send_file(INDEX_PATH)
 
 
+@app.route("/api/serial-status")
+def serial_status():
+    return _serial_status
+
+
 @app.route("/api/knob")
 def knob():
     with _serial_lock:
@@ -240,8 +274,8 @@ def generate():
         f"  Practicality/sustainability: {prac_score}/10\n\n"
         "Respond in EXACTLY this format:\n\n"
         "STORY:\n"
-        "[3-4 sentence speculative narrative of this organisation's arc — its founding, its peak, "
-        "and most likely end. Be specific to the choices made. Be matter-of-fact, not preachy.]\n\n"
+        "[2 sentences maximum. Speculative narrative of this organisation's arc — its peak and most likely end. "
+        "Be specific to the choices made. Be matter-of-fact, not preachy.]\n\n"
         f"ENV_SUMMARY: [10-12 words explaining the {env_score}/10 environmental impact score]\n\n"
         f"SOCIAL_SUMMARY: [10-12 words explaining the {social_score}/10 social impact score]\n\n"
         f"PRACTICALITY_SUMMARY: [10-12 words explaining the {prac_score}/10 practicality score]"
@@ -253,6 +287,123 @@ def generate():
         yield from stream_ollama(prompt, num_predict=450, temperature=0.7)
 
     return streamed(gen_with_scores())
+
+
+@app.route("/api/list-ports")
+def list_ports():
+    if not _SERIAL_AVAILABLE:
+        return {"ports": [], "error": "pyserial not installed"}
+    ports = []
+    for p in serial.tools.list_ports.comports():
+        desc = (p.description + p.hwid).lower()
+        likely = any(k in desc for k in ('arduino', 'usbmodem', 'usbserial', 'ch340', 'cp210'))
+        ports.append({
+            "device": p.device,
+            "description": p.description,
+            "hwid": p.hwid,
+            "likely_arduino": likely,
+        })
+    ports.sort(key=lambda x: (not x["likely_arduino"], x["device"]))
+    return {"ports": ports}
+
+
+@app.route("/api/set-port", methods=["POST"])
+def set_port():
+    global _user_port_override
+    data = request.get_json()
+    _user_port_override = data.get("port") or None
+    _serial_restart_event.set()   # wake the reader immediately
+    return {"ok": True, "port": _user_port_override}
+
+
+def _build_print_commands(data):
+    """Return ordered list of Arduino print command strings for one receipt."""
+    WRAP = 32   # characters per line at small font
+
+    def wrap(text):
+        return textwrap.wrap(str(text), WRAP) or [""]
+
+    cmds = []
+    cmds.append("PRINT_START")
+
+    # ── Header ────────────────────────────────────────────────────────────────
+    cmds += ["ALIGN:C", "BOLD_ON", "SIZE:S",
+             "TEXT:BUILD YOUR SPECULATIVE",
+             "TEXT:AI COMPANY",
+             "BOLD_OFF", "ALIGN:L", "DIVIDER"]
+
+    # ── Company name field ────────────────────────────────────────────────────
+    cmds += ["BOLD_ON", "TEXT:COMPANY NAME:", "BOLD_OFF",
+             "TEXT:", "DIVIDER"]
+
+    # ── Specs ─────────────────────────────────────────────────────────────────
+    cmds += ["BOLD_ON", "TEXT:SPECS", "BOLD_OFF"]
+    specs = [
+        ("ORG",    data.get("org_type",       "")),
+        ("ETHICS", data.get("ethical",        "")),
+        ("FUND",   data.get("funding",        "")),
+        ("DATA",   f"{data.get('data_types','')} / {data.get('data_source','')}"),
+        ("USE",    data.get("data_use",       "")),
+        ("MODEL",  f"{data.get('model_size','')} - {data.get('model_location','')}"),
+        ("PROMPT", data.get("system_prompt",  "")),
+    ]
+    for label, value in specs:
+        cmds.append(f"TEXT:{label:<7}{value}")
+    cmds.append("DIVIDER")
+
+    # ── Score blocks ──────────────────────────────────────────────────────────
+    score_sections = [
+        ("ENVIRONMENTAL IMPACT", data.get("env_score",    5), data.get("env_summary",    "")),
+        ("SOCIAL IMPACT",        data.get("social_score", 5), data.get("social_summary", "")),
+        ("PRACTICALITY",         data.get("prac_score",   5), data.get("practicality_summary", "")),
+    ]
+    for title, score, summary in score_sections:
+        score = int(score)
+        cmds += ["BOLD_ON", f"TEXT:{title}  {score}/10", "BOLD_OFF"]
+        cmds.append(f"SCORE:{score}")
+        for line in wrap(summary):
+            cmds.append(f"TEXT:{line}")
+        cmds.append("FEED:1")
+    cmds.append("DIVIDER")
+
+    # ── Story ─────────────────────────────────────────────────────────────────
+    cmds += ["BOLD_ON", "TEXT:COMPANY STORY", "BOLD_OFF"]
+    for line in wrap(data.get("story", "")):
+        cmds.append(f"TEXT:{line}")
+    cmds.append("DIVIDER")
+
+    # ── Response field ────────────────────────────────────────────────────────
+    cmds += ["BOLD_ON", "TEXT:YOUR RESPONSE", "BOLD_OFF"]
+    cmds += ["TEXT:", "TEXT:", "TEXT:", "TEXT:", "TEXT:"]
+    cmds.append("DIVIDER")
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    cmds += ["ALIGN:C",
+             "TEXT:THANK YOU FOR BUILDING",
+             "TEXT:RESPONSIBLY (?)",
+             "ALIGN:L"]
+
+    cmds.append("PRINT_END")
+    return cmds
+
+
+@app.route("/api/print", methods=["POST"])
+def print_receipt():
+    global _ser_obj
+    if not _ser_obj:
+        return {"ok": False, "error": "Arduino not connected"}, 503
+    data     = request.get_json()
+    commands = _build_print_commands(data)
+    with _serial_lock:
+        if not _ser_obj:
+            return {"ok": False, "error": "Arduino not connected"}, 503
+        try:
+            for cmd in commands:
+                _ser_obj.write((cmd + "\n").encode())
+                time.sleep(0.02)   # 20 ms gap — avoids flooding the 64-byte serial buffer
+        except Exception as e:
+            return {"ok": False, "error": str(e)}, 500
+    return {"ok": True}
 
 
 if __name__ == "__main__":
