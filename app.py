@@ -1,9 +1,11 @@
 import csv
+import base64
 import json
 import os
 import textwrap
 import threading
 import time
+from datetime import datetime
 
 import requests
 try:
@@ -124,6 +126,7 @@ GENERATION_MODEL = "llama3.2:3b"   # change this to use a different model
 
 INDEX_PATH  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
 SCORES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scores.csv")
+RECEIPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "receipt_pngs")
 
 # ── Load scoring CSV ──────────────────────────────────────────────────────────
 _scores = {}
@@ -318,6 +321,26 @@ def set_port():
     return {"ok": True, "port": _user_port_override}
 
 
+@app.route("/api/save-receipt-png", methods=["POST"])
+def save_receipt_png():
+    data = request.get_json() or {}
+    data_url = data.get("data_url", "")
+    if not isinstance(data_url, str) or not data_url.startswith("data:image/png;base64,"):
+        return {"ok": False, "error": "Invalid PNG data URL"}, 400
+    try:
+        os.makedirs(RECEIPTS_DIR, exist_ok=True)
+        b64 = data_url.split(",", 1)[1]
+        png_bytes = base64.b64decode(b64)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"speculative_ai_receipt_{ts}.png"
+        path = os.path.join(RECEIPTS_DIR, filename)
+        with open(path, "wb") as f:
+            f.write(png_bytes)
+        return {"ok": True, "filename": filename, "path": path}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}, 500
+
+
 def _build_print_commands(data):
     """Return ordered list of Arduino print command strings for one receipt."""
     WRAP = 32   # characters per line at small font
@@ -376,7 +399,12 @@ def _build_print_commands(data):
 
     # ── Response field ────────────────────────────────────────────────────────
     cmds += ["BOLD_ON", "TEXT:YOUR RESPONSE", "BOLD_OFF"]
-    cmds += ["TEXT:", "TEXT:", "TEXT:", "TEXT:", "TEXT:"]
+    cmds += [
+        "TEXT:", "TEXT:", "TEXT:", "TEXT:", "TEXT:",
+        "TEXT:", "TEXT:", "TEXT:", "TEXT:", "TEXT:",
+        "TEXT:", "TEXT:", "TEXT:", "TEXT:", "TEXT:",
+        "TEXT:", "TEXT:", "TEXT:", "TEXT:", "TEXT:"
+    ]
     cmds.append("DIVIDER")
 
     # ── Footer ────────────────────────────────────────────────────────────────
