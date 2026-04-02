@@ -387,6 +387,20 @@ def _build_print_commands(data):
     return cmds
 
 
+def _command_delay_seconds(cmd: str) -> float:
+    """
+    Return a conservative inter-command delay so Arduino USB RX buffer
+    does not overflow while the printer is physically rendering output.
+    """
+    if cmd.startswith("SCORE:"):
+        return 0.55  # bitmap transfer is the heaviest command
+    if cmd.startswith("TEXT:") or cmd == "DIVIDER":
+        return 0.12
+    if cmd.startswith("FEED:"):
+        return 0.08
+    return 0.04
+
+
 @app.route("/api/print", methods=["POST"])
 def print_receipt():
     global _ser_obj
@@ -400,7 +414,8 @@ def print_receipt():
         try:
             for cmd in commands:
                 _ser_obj.write((cmd + "\n").encode())
-                time.sleep(0.02)   # 20 ms gap — avoids flooding the 64-byte serial buffer
+                _ser_obj.flush()
+                time.sleep(_command_delay_seconds(cmd))
         except Exception as e:
             return {"ok": False, "error": str(e)}, 500
     return {"ok": True}
