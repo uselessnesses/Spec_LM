@@ -421,7 +421,7 @@ def _build_print_commands(data):
 def _ack_timeout_seconds(cmd: str) -> float:
     """Per-command timeout while waiting for Arduino ACK."""
     if cmd.startswith("SCORE:"):
-        return 30.0
+        return 60.0
     if cmd.startswith("TEXT:") or cmd == "DIVIDER":
         return 4.0
     if cmd.startswith("FEED:"):

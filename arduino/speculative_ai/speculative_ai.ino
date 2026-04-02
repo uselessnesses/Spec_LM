@@ -1,6 +1,6 @@
 /*
  * speculative_ai.ino
- * VERSION: 003 (2026-04-02)
+ * VERSION: 005 (2026-04-02)
  * ---------------------------------------------------------
  * Build Your Speculative AI Company — Arduino Mega sketch
  *
@@ -30,7 +30,7 @@
  *   SIZE:S / SIZE:M / SIZE:L   set font size
  *   ALIGN:C / ALIGN:L    centre or left justify
  *   DIVIDER              print a full-width dashed line
- *   SCORE:<n>            print 64×64 score-dial bitmap (n = 1..10)
+ *   SCORE:<n>            print enlarged score dial (n = 1..10)
  *   FEED:<n>             feed n blank lines
  *   PRINT_END            feed 4 lines, sleep printer, exit print mode
  *
@@ -60,6 +60,16 @@ String inputBuf  = "";
 unsigned long lastSensorSend = 0;
 const unsigned long SENSOR_INTERVAL_MS = 50;
 
+// Score bitmap scaling: keep source bitmaps at 128x128 in flash, print 2x in both
+// directions (256x256) while using only a single expanded row buffer in SRAM.
+const uint16_t DIAL_SRC_W = DIAL_SIZE;
+const uint16_t DIAL_SRC_H = DIAL_SIZE;
+const uint16_t DIAL_PRINT_W = DIAL_SRC_W * 2;
+const uint16_t DIAL_PRINT_H = DIAL_SRC_H * 2;
+const uint16_t DIAL_ROW_BYTES_SRC = (DIAL_SRC_W + 7) / 8;
+const uint16_t DIAL_ROW_BYTES_DST = (DIAL_PRINT_W + 7) / 8;
+uint8_t scoreScaledRowBuf[DIAL_ROW_BYTES_DST];
+
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 void setup() {
@@ -83,6 +93,38 @@ bool isDividerCandidate(const String& s) {
 void printDividerLine() {
   // 32 chars wide on common 58mm printers at small size.
   printer.println("================================");
+}
+
+uint16_t expandByte2x(uint8_t b) {
+  // Expand 8 source pixels into 16 pixels by duplicating each bit horizontally.
+  uint16_t out = 0;
+  for (uint8_t i = 0; i < 8; i++) {
+    if (b & (0x80 >> i)) out |= (uint16_t)0x3 << (14 - (i * 2));
+  }
+  return out;
+}
+
+void printScoreScaled2x(const uint8_t* bmp) {
+  // Center the dial and print each expanded row twice (vertical 2x scaling).
+  printer.justify('C');
+
+  for (uint16_t y = 0; y < DIAL_SRC_H; y++) {
+    const uint16_t srcBase = y * DIAL_ROW_BYTES_SRC;
+
+    for (uint16_t bx = 0; bx < DIAL_ROW_BYTES_SRC; bx++) {
+      uint8_t srcByte = pgm_read_byte(bmp + srcBase + bx);
+      uint16_t ex = expandByte2x(srcByte);
+      const uint16_t di = bx * 2;
+      scoreScaledRowBuf[di]     = (uint8_t)(ex >> 8);
+      scoreScaledRowBuf[di + 1] = (uint8_t)(ex & 0xFF);
+    }
+
+    printer.printBitmap(DIAL_PRINT_W, 1, scoreScaledRowBuf, false);
+    printer.printBitmap(DIAL_PRINT_W, 1, scoreScaledRowBuf, false);
+  }
+
+  // Restore default text alignment used by the rest of the receipt.
+  printer.justify('L');
 }
 
 
@@ -174,7 +216,7 @@ void handleCommand(const String& cmd) {
     int s = cmd.substring(6).toInt();
     if (s >= 1 && s <= 10) {
       const uint8_t* bmp = (const uint8_t*)pgm_read_ptr(&score_bitmaps[s - 1]);
-      printer.printBitmap(DIAL_SIZE, DIAL_SIZE, bmp, true);
+      printScoreScaled2x(bmp);
     }
   }
 }
