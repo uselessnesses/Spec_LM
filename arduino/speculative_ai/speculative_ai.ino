@@ -60,7 +60,7 @@ const unsigned long SENSOR_INTERVAL_MS = 50;
 // ── Setup ─────────────────────────────────────────────────────────────────────
 void setup() {
   Serial.begin(9600);
-  printerSerial.begin(9600);
+  printerSerial.begin(19200);
   printer.begin();
   printer.sleep();   // start in sleep mode; wake on PRINT_START
 }
