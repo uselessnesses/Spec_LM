@@ -41,6 +41,9 @@ _user_port_override   = None          # set via /api/set-port
 _serial_restart_event = threading.Event()
 _ser_obj              = None          # active Serial instance, set by _serial_reader
 _print_ack_event      = threading.Event()  # set by reader when Arduino sends "OK"
+_print_job_lock       = threading.Lock()   # prevents overlapping print jobs
+_print_active_job_id  = None
+_print_active_since   = 0.0
 
 
 def _list_candidate_ports():
@@ -85,7 +88,12 @@ def _serial_reader():
                 _ser_obj = ser
                 _serial_status = {"connected": True, "port": port, "error": None}
                 print(f"[SERIAL] Connected on {port}.")
+                reconnect_requested = False
                 while True:
+                    if _serial_restart_event.is_set():
+                        _serial_restart_event.clear()
+                        reconnect_requested = True
+                        break
                     try:
                         line = ser.readline().decode("utf-8", errors="ignore").strip()
                     except OSError:
@@ -112,6 +120,11 @@ def _serial_reader():
                             _knob_value    = round(_knob_smooth)
                             _knob2_value   = round(_knob2_smooth)
                             _slider_value  = round(_slider_smooth)
+                _ser_obj = None
+                if reconnect_requested:
+                    _serial_status = {"connected": False, "port": port, "error": "Switching serial port..."}
+                    print("[SERIAL] Port change requested — reconnecting.")
+                    continue
         except Exception as e:
             _serial_status = {"connected": False, "port": port, "error": str(e)}
             print(f"[SERIAL] Error on {port}: {e} — retrying in 3s")
@@ -323,6 +336,22 @@ def set_port():
 
 def _build_print_commands(data):
     """Return ordered list of Arduino print command strings for one receipt."""
+    if data.get("quick_test"):
+        stamp = data.get("test_stamp", "")
+        return [
+            "PRINT_START",
+            "ALIGN:C",
+            "BOLD_ON",
+            "SIZE:S",
+            "TEXT:THERMAL PRINTER TEST",
+            "BOLD_OFF",
+            "ALIGN:L",
+            "DIVIDER",
+            f"TEXT:{stamp}",
+            "TEXT:If this prints, serial path is OK.",
+            "PRINT_END",
+        ]
+
     WRAP = 32   # characters per line at small font
 
     def wrap(text):
@@ -393,6 +422,30 @@ def _build_print_commands(data):
     return cmds
 
 
+def _write_serial_line(cmd):
+    with _serial_lock:
+        if not _ser_obj:
+            raise RuntimeError("Arduino not connected")
+        _ser_obj.write((cmd + "\n").encode())
+
+
+def _send_print_commands_no_ack(commands):
+    """Compatibility path for legacy Arduino sketches that do not emit OK ACKs."""
+    for cmd in commands:
+        _write_serial_line(cmd)
+        if cmd == "PRINT_START":
+            time.sleep(0.35)
+        elif cmd.startswith("SCORE:"):
+            # Large bitmap transfer/print time
+            time.sleep(1.6)
+        elif cmd.startswith("FEED:"):
+            time.sleep(0.25)
+        elif cmd == "PRINT_END":
+            time.sleep(0.8)
+        else:
+            time.sleep(0.05)
+
+
 @app.route("/api/save-receipt", methods=["POST"])
 def save_receipt():
     from datetime import datetime
@@ -410,25 +463,107 @@ def save_receipt():
 
 @app.route("/api/print", methods=["POST"])
 def print_receipt():
+    global _print_active_job_id, _print_active_since
+    data = request.get_json(silent=True) or {}
+    job_id = data.get("client_job_id")
+    print(
+        f"[PRINT] /api/print called. "
+        f"job={job_id} "
+        f"port={_serial_status.get('port')} connected={_serial_status.get('connected')} "
+        f"last_line={_serial_status.get('last_line')!r}"
+    )
     if not _ser_obj:
         return {"ok": False, "error": "Arduino not connected"}, 503
-    data     = request.get_json()
+    if not _print_job_lock.acquire(timeout=8):
+        active_for = max(0, round(time.time() - _print_active_since, 1))
+        return {
+            "ok": False,
+            "error": (
+                f"Printer busy: job {_print_active_job_id or 'unknown'} "
+                f"has been running for {active_for}s"
+            ),
+        }, 429
+    _print_active_job_id = job_id
+    _print_active_since = time.time()
     commands = _build_print_commands(data)
     try:
-        for cmd in commands:
-            _print_ack_event.clear()
-            with _serial_lock:
-                if not _ser_obj:
+        for attempt in range(2):
+            timed_out_cmd = None
+            for cmd in commands:
+                _print_ack_event.clear()
+                try:
+                    _write_serial_line(cmd)
+                except RuntimeError:
                     return {"ok": False, "error": "Arduino not connected"}, 503
-                _ser_obj.write((cmd + "\n").encode())
-            # Lock released — _serial_reader can now acquire it and loop back to readline()
-            # so the "OK" ACK from Arduino is not blocked from being read.
-            if not _print_ack_event.wait(timeout=15):
-                print(f"[PRINT] ACK timeout on: {cmd}")
-                break
+                # Lock released — _serial_reader can now acquire it and loop back to readline()
+                # so the "OK" ACK from Arduino is not blocked from being read.
+                ack_timeout = 4 if cmd == "PRINT_START" else 15
+                if not _print_ack_event.wait(timeout=ack_timeout):
+                    timed_out_cmd = cmd
+                    print(f"[PRINT] ACK timeout on: {cmd}")
+                    break
+
+            if timed_out_cmd is None:
+                return {"ok": True}
+
+            # Common transient: serial link reset around port changes.
+            # Reconnect once and retry from the top when PRINT_START times out.
+            if timed_out_cmd == "PRINT_START" and attempt == 0:
+                print("[PRINT] Timeout on PRINT_START — forcing serial reconnect and retrying once.")
+                _serial_restart_event.set()
+                deadline = time.time() + 6
+                while time.time() < deadline:
+                    if _ser_obj and _serial_status.get("connected"):
+                        # Many Arduinos reset when USB serial reconnects; wait for firmware loop.
+                        time.sleep(2.2)
+                        try:
+                            with _serial_lock:
+                                _ser_obj.reset_input_buffer()
+                        except Exception:
+                            pass
+                        break
+                    time.sleep(0.1)
+                continue
+
+            if timed_out_cmd == "PRINT_START":
+                print("[PRINT] Falling back to no-ACK compatibility mode.")
+                try:
+                    _send_print_commands_no_ack(commands)
+                    return {
+                        "ok": True,
+                        "warning": (
+                            "Used legacy no-ACK print mode. Arduino did not ACK PRINT_START; "
+                            "please verify firmware and serial port."
+                        ),
+                    }
+                except Exception as fallback_err:
+                    print(f"[PRINT] No-ACK fallback failed: {fallback_err}")
+                return {
+                    "ok": False,
+                    "error": (
+                        "Printer ACK timeout on PRINT_START. Arduino did not acknowledge the print protocol. "
+                        "Likely causes: wrong serial port, baud mismatch, Serial Monitor open, or firmware not "
+                        "running arduino/speculative_ai/speculative_ai.ino."
+                    ),
+                    "port": _serial_status.get("port"),
+                    "last_line": _serial_status.get("last_line"),
+                }, 504
+
+            return {
+                "ok": False,
+                "error": f"Printer ACK timeout on command: {timed_out_cmd}",
+                "port": _serial_status.get("port"),
+                "last_line": _serial_status.get("last_line"),
+            }, 504
     except Exception as e:
         return {"ok": False, "error": str(e)}, 500
-    return {"ok": True}
+    finally:
+        elapsed = round(time.time() - _print_active_since, 2) if _print_active_since else 0
+        print(f"[PRINT] Job finished. job={job_id} elapsed={elapsed}s")
+        _print_active_job_id = None
+        _print_active_since = 0.0
+        _print_job_lock.release()
+    return {"ok": False, "error": "Unknown print failure"}, 500
 
 
 if __name__ == "__main__":

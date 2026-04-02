@@ -1,5 +1,5 @@
 /*
- * speculative_ai.ino  v4
+ * speculative_ai.ino  v5
  * ---------------------------------------------------------
  * Build Your Speculative AI Company — Arduino Mega sketch
  *
@@ -42,6 +42,10 @@
 #include <Adafruit_Thermal.h>
 #include "bitmaps.h"
 
+// Many 58mm clone printers ship at 9600 baud.
+// If yours needs 19200, change this value and re-upload.
+const long PRINTER_BAUD = 9600;
+
 // ── Printer serial ────────────────────────────────────────────────────────────
 // Pin 5 = Arduino RX  ← printer TX (green wire)
 // Pin 6 = Arduino TX  → printer RX (yellow wire)
@@ -79,7 +83,7 @@ const unsigned long SENSOR_INTERVAL_MS = 50;
 void setup() {
   initScoreAddrs();
   Serial.begin(9600);
-  printerSerial.begin(19200);   // Adafruit thermal printers default to 19200 baud
+  printerSerial.begin(PRINTER_BAUD);
   printer.begin();
   printer.sleep();   // start in sleep mode; wake on PRINT_START
 }
@@ -143,17 +147,18 @@ void handleCommand(const String& cmd) {
   // ── Mode control (always accepted) ──────────────────────────────────────────
   if (cmd == "PRINT_START") {
     printing = true;
-    Serial.println("OK");   // ACK Flask before slow printer init
     printer.wake();
     printer.setDefault();
+    delay(80);  // give sleepy printers a moment before first text command
+    Serial.println("OK");
     return;
   }
 
   if (cmd == "PRINT_END") {
-    printing = false;
-    Serial.println("OK");   // ACK Flask before slow paper feed
     printer.feed(4);
     printer.sleep();
+    printing = false;
+    Serial.println("OK");
     return;
   }
 

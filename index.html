@@ -393,7 +393,9 @@ html, body {
   flex-shrink: 0;
 }
 
-#start-over-btn {
+#start-over-btn,
+#print-again-btn,
+#test-print-btn {
   font-family: var(--font);
   font-size: 11px;
   letter-spacing: 2px;
@@ -406,7 +408,10 @@ html, body {
   transition: all 0.15s;
   flex-shrink: 0;
 }
-#start-over-btn:hover { color: var(--text); border-color: var(--dim); }
+#start-over-btn:hover,
+#print-again-btn:hover,
+#test-print-btn:hover { color: var(--text); border-color: var(--dim); }
+#receipt-actions button:disabled { opacity: 0.45; cursor: default; }
 
 /* ============================================================
    NAV BAR
@@ -735,6 +740,8 @@ html, body {
         </div>
       </div>
       <div id="receipt-actions">
+        <button id="print-again-btn">&#128438; PRINT AGAIN</button>
+        <button id="test-print-btn">&#9881; TEST PRINT</button>
         <button id="start-over-btn">&#8617; START OVER</button>
       </div>
     </div>
@@ -1538,12 +1545,12 @@ async function generateFinal() {
 
     const parsed = parseFinal(fullBuf);
     overlay.classList.remove('active');
-    renderReceipt(parsed);
     showScreen(3);
+    renderReceipt(parsed);
   } catch (e) {
     overlay.classList.remove('active');
-    renderReceipt({ story: 'Could not reach Ollama. Is it running?', envSummary: '', socialSummary: '', practicalitySummary: '' });
     showScreen(3);
+    renderReceipt({ story: 'Could not reach Ollama. Is it running?', envSummary: '', socialSummary: '', practicalitySummary: '' });
   }
 }
 
@@ -1609,9 +1616,13 @@ function makeScoreBlock(title, score, summary) {
 }
 
 let _receiptData = null;
+let _autoPrintRunId = 0;
+let _autoPrintDoneRun = 0;
+let _printBusy = false;
 
 function renderReceipt(data) {
   _receiptData = { ...data };
+  const thisRunId = ++_autoPrintRunId;
   const body = document.getElementById('receipt-body');
 
   // Spec summary lines
@@ -1691,10 +1702,21 @@ function renderReceipt(data) {
     receipt.style.transform  = '';
     receipt.classList.add('printing');
   }));
-  receipt.addEventListener('transitionend', () => {
+  const runAutoPrint = () => {
+    // Ignore stale timers/events from older renders.
+    if (thisRunId !== _autoPrintRunId) return;
+    if (_autoPrintDoneRun === thisRunId) return;
+    _autoPrintDoneRun = thisRunId;
     wrap.style.overflow = 'visible';
     _autoSaveAndPrint();
+  };
+  receipt.addEventListener('transitionend', (e) => {
+    if (e.propertyName === 'transform') runAutoPrint();
   }, { once: true });
+  // Robust fallbacks: if transition events are missed, still print.
+  setTimeout(runAutoPrint, 650);
+  setTimeout(runAutoPrint, 1700);
+  setTimeout(runAutoPrint, 3500);
 }
 
 /* ============================================================
@@ -1722,6 +1744,8 @@ function startOver() {
   document.getElementById('receipt-body').innerHTML = '';
   document.getElementById('receipt-printer-wrap').style.overflow = 'hidden';
   _receiptData = null;
+  _autoPrintRunId = 0;
+  _autoPrintDoneRun = 0;
 
   _lastK1Idx = -1; _lastK2Idx = -1; _lastSlIdx = -1;
   _lastK1Raw = -1; _lastK2Raw = -1; _lastSlRaw = -1;
@@ -1912,6 +1936,28 @@ document.addEventListener('DOMContentLoaded', () => {
     else showScreen(state.screen + 1);
   });
   document.getElementById('start-over-btn').addEventListener('click', startOver);
+  document.getElementById('print-again-btn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const oldLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'PRINTING...';
+    await printReceipt();
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = oldLabel;
+    }, 600);
+  });
+  document.getElementById('test-print-btn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const oldLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'TESTING...';
+    await printTestReceipt();
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = oldLabel;
+    }, 600);
+  });
 
   showScreen(0);
 });
@@ -1933,37 +1979,138 @@ async function _autoSaveAndPrint() {
     });
   } catch (_) {}
 
-  // Send to thermal printer (silent — no alert on failure)
-  printReceipt();
+  // Send to thermal printer
+  await printReceipt();
+}
+
+function _setPrintDebug(msg) {
+  const dbgLine = document.getElementById('dbg-last-line');
+  if (dbgLine) dbgLine.textContent = msg;
+}
+
+function _setPrintButtonsDisabled(disabled) {
+  const b1 = document.getElementById('print-again-btn');
+  const b2 = document.getElementById('test-print-btn');
+  if (b1) b1.disabled = disabled;
+  if (b2) b2.disabled = disabled;
+}
+
+async function _sendPrintPayload(payload, label = 'RECEIPT') {
+  if (_printBusy) {
+    _setPrintDebug('PRINT BUSY: previous job still running');
+    return { ok: false, error: 'print busy' };
+  }
+  _printBusy = true;
+  _setPrintButtonsDisabled(true);
+  const payloadWithId = {
+    ...payload,
+    client_job_id: payload.client_job_id || `job-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+  };
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      _setPrintDebug(`PRINT: sending (${label})`);
+      console.log('[PRINT] Sending payload:', label, payloadWithId);
+      const r = await fetch('/api/print', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payloadWithId),
+      });
+      let body = null;
+      try {
+        body = await r.json();
+      } catch (_) {}
+
+      if (r.status === 429 && attempt === 0) {
+        _setPrintDebug('PRINT BUSY: retrying...');
+        await new Promise((res) => setTimeout(res, 1800));
+        continue;
+      }
+
+      if (!r.ok) {
+        let msg = `HTTP ${r.status}`;
+        if (body && body.error) msg = body.error;
+        console.error('[PRINT] Failed:', msg);
+        _setPrintDebug(`PRINT ERROR: ${msg}`);
+        return { ok: false, error: msg };
+      }
+      if (body && body.warning) {
+        console.warn('[PRINT] Warning:', body.warning);
+        _setPrintDebug(`PRINT WARN: ${body.warning}`);
+        return { ok: true, warning: body.warning };
+      }
+      _setPrintDebug(`PRINT OK: ${label}`);
+      return { ok: true };
+    }
+    _setPrintDebug('PRINT ERROR: busy timeout');
+    return { ok: false, error: 'busy timeout' };
+  } finally {
+    _printBusy = false;
+    _setPrintButtonsDisabled(false);
+  }
+}
+
+function _buildReceiptPayload() {
+  return {
+    org_type:              CTRL.ORG_TYPE.names[state.orgTypeIdx],
+    ethical:               CTRL.ETHICAL.names[state.ethicalIdx],
+    funding:               CTRL.FUNDING.names[state.fundingIdx],
+    data_types:            CTRL.DATA_TYPES.names[state.dataTypesIdx],
+    data_source:           CTRL.DATA_SOURCE.names[state.dataSourceIdx],
+    data_use:              CTRL.DATA_USE.names[state.dataUseIdx],
+    model_size:            CTRL.MODEL_SIZE.names[state.modelSizeIdx],
+    model_location:        CTRL.MODEL_LOCATION.names[state.modelLocationIdx],
+    system_prompt:         CTRL.SYSTEM_PROMPT.names[state.systemPromptIdx],
+    env_score:             state.envScore,
+    social_score:          state.socialScore,
+    prac_score:            state.pracScore,
+    env_summary:           _receiptData ? (_receiptData.envSummary || '') : '',
+    social_summary:        _receiptData ? (_receiptData.socialSummary || '') : '',
+    practicality_summary:  _receiptData ? (_receiptData.practicalitySummary || '') : '',
+    story:                 _receiptData ? (_receiptData.story || '') : '',
+  };
 }
 
 async function printReceipt() {
-  if (!_receiptData) return;
+  if (!_receiptData) {
+    _setPrintDebug('PRINT ERROR: no receipt data yet');
+    return;
+  }
   try {
-    const payload = {
-      org_type:              CTRL.ORG_TYPE.names[state.orgTypeIdx],
-      ethical:               CTRL.ETHICAL.names[state.ethicalIdx],
-      funding:               CTRL.FUNDING.names[state.fundingIdx],
-      data_types:            CTRL.DATA_TYPES.names[state.dataTypesIdx],
-      data_source:           CTRL.DATA_SOURCE.names[state.dataSourceIdx],
-      data_use:              CTRL.DATA_USE.names[state.dataUseIdx],
-      model_size:            CTRL.MODEL_SIZE.names[state.modelSizeIdx],
-      model_location:        CTRL.MODEL_LOCATION.names[state.modelLocationIdx],
-      system_prompt:         CTRL.SYSTEM_PROMPT.names[state.systemPromptIdx],
-      env_score:             state.envScore,
-      social_score:          state.socialScore,
-      prac_score:            state.pracScore,
-      env_summary:           _receiptData.envSummary           || '',
-      social_summary:        _receiptData.socialSummary        || '',
-      practicality_summary:  _receiptData.practicalitySummary  || '',
-      story:                 _receiptData.story                || '',
-    };
-    await fetch('/api/print', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-  } catch (_) {}
+    await _sendPrintPayload(_buildReceiptPayload(), 'RECEIPT');
+  } catch (e) {
+    console.error('[PRINT] Request failed:', e);
+    _setPrintDebug('PRINT ERROR: request failed');
+  }
+}
+
+async function printTestReceipt() {
+  const stamp = new Date().toISOString();
+  const payload = {
+    quick_test: true,
+    test_stamp: `TEST ${stamp}`,
+    org_type: 'TEST MODE',
+    ethical: 'N/A',
+    funding: 'N/A',
+    data_types: 'N/A',
+    data_source: 'N/A',
+    data_use: 'N/A',
+    model_size: 'N/A',
+    model_location: 'N/A',
+    system_prompt: 'N/A',
+    env_score: 5,
+    social_score: 5,
+    prac_score: 5,
+    env_summary: 'Manual test print path check.',
+    social_summary: 'Manual test print path check.',
+    practicality_summary: 'Manual test print path check.',
+    story: `TEST PRINT ${stamp}`,
+  };
+  try {
+    await _sendPrintPayload(payload, 'TEST');
+  } catch (e) {
+    console.error('[PRINT] Test request failed:', e);
+    _setPrintDebug('PRINT ERROR: test request failed');
+  }
 }
 </script>
 
