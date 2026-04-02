@@ -344,6 +344,7 @@ def save_receipt_png():
 def _build_print_commands(data):
     """Return ordered list of Arduino print command strings for one receipt."""
     WRAP = 32   # characters per line at small font
+    DASH_LINE = "TEXT:--------------------------------"
 
     def wrap(text):
         return textwrap.wrap(str(text), WRAP) or [""]
@@ -355,14 +356,14 @@ def _build_print_commands(data):
     cmds += ["ALIGN:C", "BOLD_ON", "SIZE:S",
              "TEXT:BUILD YOUR SPECULATIVE",
              "TEXT:AI COMPANY",
-             "BOLD_OFF", "ALIGN:L", "DIVIDER"]
+             "BOLD_OFF", "ALIGN:L", DASH_LINE]
 
     # ── Company name field ────────────────────────────────────────────────────
     cmds += ["BOLD_ON", "TEXT:COMPANY NAME:", "BOLD_OFF",
-             "TEXT:", "DIVIDER"]
+             "TEXT:", DASH_LINE]
 
     # ── Specs ─────────────────────────────────────────────────────────────────
-    cmds += ["BOLD_ON", "TEXT:SPECS", "BOLD_OFF"]
+    cmds += ["BOLD_ON", "TEXT:SPECS", "BOLD_OFF", DASH_LINE]
     specs = [
         ("ORG",    data.get("org_type",       "")),
         ("ETHICS", data.get("ethical",        "")),
@@ -374,7 +375,7 @@ def _build_print_commands(data):
     ]
     for label, value in specs:
         cmds.append(f"TEXT:{label:<7}{value}")
-    cmds.append("DIVIDER")
+    cmds.append(DASH_LINE)
 
     # ── Score blocks ──────────────────────────────────────────────────────────
     score_sections = [
@@ -389,23 +390,23 @@ def _build_print_commands(data):
         for line in wrap(summary):
             cmds.append(f"TEXT:{line}")
         cmds.append("FEED:1")
-    cmds.append("DIVIDER")
+        cmds.append(DASH_LINE)
 
     # ── Story ─────────────────────────────────────────────────────────────────
-    cmds += ["BOLD_ON", "TEXT:COMPANY STORY", "BOLD_OFF"]
+    cmds += ["BOLD_ON", "TEXT:COMPANY STORY", "BOLD_OFF", DASH_LINE]
     for line in wrap(data.get("story", "")):
         cmds.append(f"TEXT:{line}")
-    cmds.append("DIVIDER")
+    cmds.append(DASH_LINE)
 
     # ── Response field ────────────────────────────────────────────────────────
-    cmds += ["BOLD_ON", "TEXT:YOUR RESPONSE", "BOLD_OFF"]
+    cmds += ["BOLD_ON", "TEXT:YOUR RESPONSE", "BOLD_OFF", DASH_LINE]
     cmds += [
         "TEXT:", "TEXT:", "TEXT:", "TEXT:", "TEXT:",
         "TEXT:", "TEXT:", "TEXT:", "TEXT:", "TEXT:",
         "TEXT:", "TEXT:", "TEXT:", "TEXT:", "TEXT:",
         "TEXT:", "TEXT:", "TEXT:", "TEXT:", "TEXT:"
     ]
-    cmds.append("DIVIDER")
+    cmds.append(DASH_LINE)
 
     # ── Footer ────────────────────────────────────────────────────────────────
     cmds += ["ALIGN:C",

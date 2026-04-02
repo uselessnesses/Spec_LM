@@ -1,6 +1,6 @@
 /*
  * speculative_ai.ino
- * VERSION: 002 (2026-04-02)
+ * VERSION: 003 (2026-04-02)
  * ---------------------------------------------------------
  * Build Your Speculative AI Company — Arduino Mega sketch
  *
@@ -70,6 +70,22 @@ void setup() {
 }
 
 
+// ── Divider helpers ───────────────────────────────────────────────────────────
+bool isDividerCandidate(const String& s) {
+  if (s.length() < 8) return false;
+  for (int i = 0; i < s.length(); i++) {
+    char c = s.charAt(i);
+    if (c != '-' && c != '=' && c != '_') return false;
+  }
+  return true;
+}
+
+void printDividerLine() {
+  // 32 chars wide on common 58mm printers at small size.
+  printer.println("================================");
+}
+
+
 // ── Main loop ─────────────────────────────────────────────────────────────────
 void loop() {
   // Non-blocking serial read — buffer chars until newline
@@ -125,7 +141,9 @@ void handleCommand(const String& cmd) {
 
   // ── Text / formatting ────────────────────────────────────────────────────────
   if (cmd.startsWith("TEXT:")) {
-    printer.println(cmd.substring(5));
+    String line = cmd.substring(5);
+    if (isDividerCandidate(line)) printDividerLine();
+    else                          printer.println(line);
 
   } else if (cmd == "BOLD_ON") {
     printer.boldOn();
@@ -144,7 +162,7 @@ void handleCommand(const String& cmd) {
     else               printer.justify('L');
 
   } else if (cmd == "DIVIDER") {
-    printer.println("--------------------------------");
+    printDividerLine();
 
   // ── Paper feed ───────────────────────────────────────────────────────────────
   } else if (cmd.startsWith("FEED:")) {
