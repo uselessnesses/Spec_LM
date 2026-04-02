@@ -1,3 +1,4 @@
+import base64
 import csv
 import json
 import os
@@ -39,6 +40,7 @@ _serial_status        = {"connected": False, "port": None, "error": None, "last_
 _user_port_override   = None          # set via /api/set-port
 _serial_restart_event = threading.Event()
 _ser_obj              = None          # active Serial instance, set by _serial_reader
+_print_ack_event      = threading.Event()  # set by reader when Arduino sends "OK"
 
 
 def _list_candidate_ports():
@@ -90,6 +92,9 @@ def _serial_reader():
                         continue  # transient USB-serial artefact
                     if line:
                         _serial_status["last_line"] = line
+                    if line == "OK":
+                        _print_ack_event.set()
+                        continue
                     parts = line.split(",")
                     if len(parts) == 3 and all(p.isdigit() for p in parts):
                         k1 = int(parts[0])
@@ -334,7 +339,7 @@ def _build_print_commands(data):
 
     # ── Company name field ────────────────────────────────────────────────────
     cmds += ["BOLD_ON", "TEXT:COMPANY NAME:", "BOLD_OFF",
-             "TEXT:", "DIVIDER"]
+             "TEXT:________________________________", "DIVIDER"]
 
     # ── Specs ─────────────────────────────────────────────────────────────────
     cmds += ["BOLD_ON", "TEXT:SPECS", "BOLD_OFF"]
@@ -374,7 +379,8 @@ def _build_print_commands(data):
 
     # ── Response field ────────────────────────────────────────────────────────
     cmds += ["BOLD_ON", "TEXT:YOUR RESPONSE", "BOLD_OFF"]
-    cmds += ["TEXT:", "TEXT:", "TEXT:", "TEXT:", "TEXT:"]
+    for _ in range(8):
+        cmds.append("TEXT:________________________________")
     cmds.append("DIVIDER")
 
     # ── Footer ────────────────────────────────────────────────────────────────
@@ -387,22 +393,41 @@ def _build_print_commands(data):
     return cmds
 
 
+@app.route("/api/save-receipt", methods=["POST"])
+def save_receipt():
+    from datetime import datetime
+    data    = request.get_json()
+    img_b64 = data.get("image", "")
+    if "," in img_b64:
+        img_b64 = img_b64.split(",", 1)[1]
+    receipts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "receipts")
+    os.makedirs(receipts_dir, exist_ok=True)
+    filename = f"receipt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+    with open(os.path.join(receipts_dir, filename), "wb") as f:
+        f.write(base64.b64decode(img_b64))
+    return {"ok": True, "filename": filename}
+
+
 @app.route("/api/print", methods=["POST"])
 def print_receipt():
-    global _ser_obj
     if not _ser_obj:
         return {"ok": False, "error": "Arduino not connected"}, 503
     data     = request.get_json()
     commands = _build_print_commands(data)
-    with _serial_lock:
-        if not _ser_obj:
-            return {"ok": False, "error": "Arduino not connected"}, 503
-        try:
-            for cmd in commands:
+    try:
+        for cmd in commands:
+            _print_ack_event.clear()
+            with _serial_lock:
+                if not _ser_obj:
+                    return {"ok": False, "error": "Arduino not connected"}, 503
                 _ser_obj.write((cmd + "\n").encode())
-                time.sleep(0.02)   # 20 ms gap — avoids flooding the 64-byte serial buffer
-        except Exception as e:
-            return {"ok": False, "error": str(e)}, 500
+            # Lock released — _serial_reader can now acquire it and loop back to readline()
+            # so the "OK" ACK from Arduino is not blocked from being read.
+            if not _print_ack_event.wait(timeout=15):
+                print(f"[PRINT] ACK timeout on: {cmd}")
+                break
+    except Exception as e:
+        return {"ok": False, "error": str(e)}, 500
     return {"ok": True}
 
 

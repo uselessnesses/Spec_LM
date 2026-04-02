@@ -1,5 +1,5 @@
 /*
- * speculative_ai.ino
+ * speculative_ai.ino  v4
  * ---------------------------------------------------------
  * Build Your Speculative AI Company — Arduino Mega sketch
  *
@@ -29,7 +29,7 @@
  *   SIZE:S / SIZE:M / SIZE:L   set font size
  *   ALIGN:C / ALIGN:L    centre or left justify
  *   DIVIDER              print a full-width dashed line
- *   SCORE:<n>            print 64×64 score-dial bitmap (n = 1..10)
+ *   SCORE:<n>            print 384×256 score-dial bitmap (n = 1..10)
  *   FEED:<n>             feed n blank lines
  *   PRINT_END            feed 4 lines, sleep printer, exit print mode
  *
@@ -43,10 +43,28 @@
 #include "bitmaps.h"
 
 // ── Printer serial ────────────────────────────────────────────────────────────
-// Pin 5 = Arduino RX  ← printer TX (usually green wire)
-// Pin 6 = Arduino TX  → printer RX (usually yellow wire)
+// Pin 5 = Arduino RX  ← printer TX (green wire)
+// Pin 6 = Arduino TX  → printer RX (yellow wire)
 SoftwareSerial printerSerial(5, 6);
 Adafruit_Thermal printer(&printerSerial);
+
+// ── Far-PROGMEM address table ─────────────────────────────────────────────────
+// pgm_get_far_address() is a GCC statement-expression; it cannot be used in a
+// static initialiser, so we populate this array at runtime in initScoreAddrs().
+static uint32_t score_addrs[10];
+
+void initScoreAddrs() {
+  score_addrs[0] = pgm_get_far_address(score_1);
+  score_addrs[1] = pgm_get_far_address(score_2);
+  score_addrs[2] = pgm_get_far_address(score_3);
+  score_addrs[3] = pgm_get_far_address(score_4);
+  score_addrs[4] = pgm_get_far_address(score_5);
+  score_addrs[5] = pgm_get_far_address(score_6);
+  score_addrs[6] = pgm_get_far_address(score_7);
+  score_addrs[7] = pgm_get_far_address(score_8);
+  score_addrs[8] = pgm_get_far_address(score_9);
+  score_addrs[9] = pgm_get_far_address(score_10);
+}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 bool   printing  = false;
@@ -59,10 +77,34 @@ const unsigned long SENSOR_INTERVAL_MS = 50;
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 void setup() {
+  initScoreAddrs();
   Serial.begin(9600);
-  printerSerial.begin(9600);
+  printerSerial.begin(19200);   // Adafruit thermal printers default to 19200 baud
   printer.begin();
   printer.sleep();   // start in sleep mode; wake on PRINT_START
+}
+
+
+// ── Bitmap print via far PROGMEM (ELPM) ──────────────────────────────────────
+// Sends DC2 '*' bitmap command directly to printerSerial so we can read bytes
+// with pgm_read_byte_far() rather than going through the library's fromProgmem
+// path, which uses pgm_read_byte() (LPM — only reaches lower 64 KB of flash).
+void printBitmapFromFarProgmem(uint32_t addr) {
+  const uint8_t ROW_BYTES = DIAL_W / 8;   // 48 bytes per row
+  int rowsLeft = DIAL_H;
+  while (rowsLeft > 0) {
+    uint8_t chunk = (rowsLeft > 255) ? 255 : (uint8_t)rowsLeft;
+    printerSerial.write(0x12);    // DC2
+    printerSerial.write('*');
+    printerSerial.write(chunk);
+    printerSerial.write(ROW_BYTES);
+    for (int r = 0; r < chunk; r++) {
+      for (int b = 0; b < ROW_BYTES; b++) {
+        printerSerial.write(pgm_read_byte_far(addr++));
+      }
+    }
+    rowsLeft -= chunk;
+  }
 }
 
 
@@ -101,20 +143,22 @@ void handleCommand(const String& cmd) {
   // ── Mode control (always accepted) ──────────────────────────────────────────
   if (cmd == "PRINT_START") {
     printing = true;
+    Serial.println("OK");   // ACK Flask before slow printer init
     printer.wake();
     printer.setDefault();
     return;
   }
 
   if (cmd == "PRINT_END") {
+    printing = false;
+    Serial.println("OK");   // ACK Flask before slow paper feed
     printer.feed(4);
     printer.sleep();
-    printing = false;
     return;
   }
 
   // All other commands require print mode to be active
-  if (!printing) return;
+  if (!printing) { Serial.println("OK"); return; }
 
   // ── Text / formatting ────────────────────────────────────────────────────────
   if (cmd.startsWith("TEXT:")) {
@@ -148,8 +192,10 @@ void handleCommand(const String& cmd) {
   } else if (cmd.startsWith("SCORE:")) {
     int s = cmd.substring(6).toInt();
     if (s >= 1 && s <= 10) {
-      const uint8_t* bmp = (const uint8_t*)pgm_read_ptr(&score_bitmaps[s - 1]);
-      printer.printBitmap(DIAL_SIZE, DIAL_SIZE, bmp, true);
+      printBitmapFromFarProgmem(score_addrs[s - 1]);
     }
   }
+
+  // ACK — tells Flask the command is done and it can send the next one
+  Serial.println("OK");
 }
