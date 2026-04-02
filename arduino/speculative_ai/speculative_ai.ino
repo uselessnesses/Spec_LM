@@ -1,5 +1,6 @@
 /*
  * speculative_ai.ino
+ * VERSION: 002 (2026-04-02)
  * ---------------------------------------------------------
  * Build Your Speculative AI Company — Arduino Mega sketch
  *
@@ -32,6 +33,9 @@
  *   SCORE:<n>            print 64×64 score-dial bitmap (n = 1..10)
  *   FEED:<n>             feed n blank lines
  *   PRINT_END            feed 4 lines, sleep printer, exit print mode
+ *
+ * Arduino acknowledges every non-empty command with:
+ *   ACK
  *
  * Libraries required (install via Arduino Library Manager)
  * ──────────────────────────────────────────────────────────
@@ -73,7 +77,10 @@ void loop() {
     char c = (char)Serial.read();
     if (c == '\n') {
       inputBuf.trim();
-      if (inputBuf.length() > 0) handleCommand(inputBuf);
+      if (inputBuf.length() > 0) {
+        handleCommand(inputBuf);
+        Serial.println("ACK");
+      }
       inputBuf = "";
     } else if (c != '\r') {
       inputBuf += c;

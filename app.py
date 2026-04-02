@@ -35,6 +35,7 @@ _knob2_smooth  = 512.0
 _slider_smooth = 512.0
 SMOOTH_ALPHA   = 0.25
 _serial_lock          = threading.Lock()
+_serial_io_lock       = threading.Lock()
 _serial_status        = {"connected": False, "port": None, "error": None, "last_line": ""}
 _user_port_override   = None          # set via /api/set-port
 _serial_restart_event = threading.Event()
@@ -78,14 +79,15 @@ def _serial_reader():
             continue
         print(f"[SERIAL] Connecting to {port} at {SERIAL_BAUD} baud…")
         try:
-            with serial.Serial(port, SERIAL_BAUD, timeout=2) as ser:
+            with serial.Serial(port, SERIAL_BAUD, timeout=0.25) as ser:
                 ser.reset_input_buffer()
                 _ser_obj = ser
                 _serial_status = {"connected": True, "port": port, "error": None}
                 print(f"[SERIAL] Connected on {port}.")
                 while True:
                     try:
-                        line = ser.readline().decode("utf-8", errors="ignore").strip()
+                        with _serial_io_lock:
+                            line = ser.readline().decode("utf-8", errors="ignore").strip()
                     except OSError:
                         continue  # transient USB-serial artefact
                     if line:
@@ -387,18 +389,31 @@ def _build_print_commands(data):
     return cmds
 
 
-def _command_delay_seconds(cmd: str) -> float:
-    """
-    Return a conservative inter-command delay so Arduino USB RX buffer
-    does not overflow while the printer is physically rendering output.
-    """
+def _ack_timeout_seconds(cmd: str) -> float:
+    """Per-command timeout while waiting for Arduino ACK."""
     if cmd.startswith("SCORE:"):
-        return 0.55  # bitmap transfer is the heaviest command
+        return 8.0
     if cmd.startswith("TEXT:") or cmd == "DIVIDER":
-        return 0.12
+        return 4.0
     if cmd.startswith("FEED:"):
-        return 0.08
-    return 0.04
+        return 5.0
+    return 3.0
+
+
+def _wait_for_arduino_ack(ser, timeout_s: float):
+    """Wait until Arduino emits ACK; ignore other incoming lines."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        raw = ser.readline()
+        if not raw:
+            continue
+        line = raw.decode("utf-8", errors="ignore").strip()
+        if not line:
+            continue
+        _serial_status["last_line"] = line
+        if line == "ACK":
+            return True, None
+    return False, f"timeout after {timeout_s:.1f}s"
 
 
 @app.route("/api/print", methods=["POST"])
@@ -408,14 +423,18 @@ def print_receipt():
         return {"ok": False, "error": "Arduino not connected"}, 503
     data     = request.get_json()
     commands = _build_print_commands(data)
-    with _serial_lock:
-        if not _ser_obj:
+    with _serial_io_lock:
+        ser = _ser_obj
+        if not ser:
             return {"ok": False, "error": "Arduino not connected"}, 503
         try:
+            ser.reset_input_buffer()  # discard stale sensor lines before print transaction
             for cmd in commands:
-                _ser_obj.write((cmd + "\n").encode())
-                _ser_obj.flush()
-                time.sleep(_command_delay_seconds(cmd))
+                ser.write((cmd + "\n").encode())
+                ser.flush()
+                ok, detail = _wait_for_arduino_ack(ser, _ack_timeout_seconds(cmd))
+                if not ok:
+                    return {"ok": False, "error": f"No ACK after '{cmd}': {detail}"}, 504
         except Exception as e:
             return {"ok": False, "error": str(e)}, 500
     return {"ok": True}
