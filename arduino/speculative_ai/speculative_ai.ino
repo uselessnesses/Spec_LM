@@ -1,6 +1,6 @@
 /*
  * speculative_ai.ino
- * VERSION: 005 (2026-04-02)
+ * VERSION: 006 (2026-04-02)
  * ---------------------------------------------------------
  * Build Your Speculative AI Company — Arduino Mega sketch
  *
@@ -61,14 +61,16 @@ unsigned long lastSensorSend = 0;
 const unsigned long SENSOR_INTERVAL_MS = 50;
 
 // Score bitmap scaling: keep source bitmaps at 128x128 in flash, print 2x in both
-// directions (256x256) while using only a single expanded row buffer in SRAM.
+// directions (256x256) while using a small strip buffer in SRAM for speed.
 const uint16_t DIAL_SRC_W = DIAL_SIZE;
 const uint16_t DIAL_SRC_H = DIAL_SIZE;
-const uint16_t DIAL_PRINT_W = DIAL_SRC_W * 2;
-const uint16_t DIAL_PRINT_H = DIAL_SRC_H * 2;
+const uint8_t  DIAL_SCALE = 2;
+const uint16_t DIAL_PRINT_W = DIAL_SRC_W * DIAL_SCALE;
+const uint16_t DIAL_PRINT_H = DIAL_SRC_H * DIAL_SCALE;
 const uint16_t DIAL_ROW_BYTES_SRC = (DIAL_SRC_W + 7) / 8;
 const uint16_t DIAL_ROW_BYTES_DST = (DIAL_PRINT_W + 7) / 8;
-uint8_t scoreScaledRowBuf[DIAL_ROW_BYTES_DST];
+const uint8_t  DIAL_STRIP_ROWS = 16;
+uint8_t scoreScaledStripBuf[DIAL_ROW_BYTES_DST * DIAL_STRIP_ROWS];
 
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
@@ -95,6 +97,21 @@ void printDividerLine() {
   printer.println("================================");
 }
 
+void applyPrinterQualityPreset() {
+  // ESC 7 n1 n2 n3 : heat config (max dots, heat time, heat interval).
+  printerSerial.write((uint8_t)27);
+  printerSerial.write((uint8_t)55);
+  printerSerial.write((uint8_t)11);
+  printerSerial.write((uint8_t)150);
+  printerSerial.write((uint8_t)30);
+
+  // DC2 # n : print density and break time.
+  // n = (breakTime << 5) | density
+  printerSerial.write((uint8_t)18);
+  printerSerial.write((uint8_t)35);
+  printerSerial.write((uint8_t)((2 << 5) | 15));
+}
+
 uint16_t expandByte2x(uint8_t b) {
   // Expand 8 source pixels into 16 pixels by duplicating each bit horizontally.
   uint16_t out = 0;
@@ -104,23 +121,33 @@ uint16_t expandByte2x(uint8_t b) {
   return out;
 }
 
+void expandSourceRow2x(const uint8_t* bmp, uint16_t ySrc, uint8_t* dstRow) {
+  const uint16_t srcBase = ySrc * DIAL_ROW_BYTES_SRC;
+  for (uint16_t bx = 0; bx < DIAL_ROW_BYTES_SRC; bx++) {
+    uint8_t srcByte = pgm_read_byte(bmp + srcBase + bx);
+    uint16_t ex = expandByte2x(srcByte);
+    const uint16_t di = bx * 2;
+    dstRow[di]     = (uint8_t)(ex >> 8);
+    dstRow[di + 1] = (uint8_t)(ex & 0xFF);
+  }
+}
+
 void printScoreScaled2x(const uint8_t* bmp) {
-  // Center the dial and print each expanded row twice (vertical 2x scaling).
+  // Center the dial and print in strips for much lower command overhead.
   printer.justify('C');
 
-  for (uint16_t y = 0; y < DIAL_SRC_H; y++) {
-    const uint16_t srcBase = y * DIAL_ROW_BYTES_SRC;
+  for (uint16_t yOutStart = 0; yOutStart < DIAL_PRINT_H; yOutStart += DIAL_STRIP_ROWS) {
+    uint16_t rowsThisStrip = DIAL_PRINT_H - yOutStart;
+    if (rowsThisStrip > DIAL_STRIP_ROWS) rowsThisStrip = DIAL_STRIP_ROWS;
 
-    for (uint16_t bx = 0; bx < DIAL_ROW_BYTES_SRC; bx++) {
-      uint8_t srcByte = pgm_read_byte(bmp + srcBase + bx);
-      uint16_t ex = expandByte2x(srcByte);
-      const uint16_t di = bx * 2;
-      scoreScaledRowBuf[di]     = (uint8_t)(ex >> 8);
-      scoreScaledRowBuf[di + 1] = (uint8_t)(ex & 0xFF);
+    for (uint16_t r = 0; r < rowsThisStrip; r++) {
+      const uint16_t yOut = yOutStart + r;
+      const uint16_t ySrc = yOut / DIAL_SCALE;
+      uint8_t* dstRow = &scoreScaledStripBuf[r * DIAL_ROW_BYTES_DST];
+      expandSourceRow2x(bmp, ySrc, dstRow);
     }
 
-    printer.printBitmap(DIAL_PRINT_W, 1, scoreScaledRowBuf, false);
-    printer.printBitmap(DIAL_PRINT_W, 1, scoreScaledRowBuf, false);
+    printer.printBitmap(DIAL_PRINT_W, rowsThisStrip, scoreScaledStripBuf, false);
   }
 
   // Restore default text alignment used by the rest of the receipt.
@@ -168,6 +195,7 @@ void handleCommand(const String& cmd) {
     printing = true;
     printer.wake();
     printer.setDefault();
+    applyPrinterQualityPreset();
     return;
   }
 
