@@ -637,11 +637,11 @@ html, body {
   <!-- SCREEN CONTAINER -->
   <div id="screen-container">
 
-    <!-- SCREEN 0: WHO ARE YOU? -->
+    <!-- SCREEN 0: YOUR ORGANISATION -->
     <div id="screen-0" class="screen-panel">
       <div class="screen-header">
         <div class="screen-num">01 / 03</div>
-        <div class="screen-title">WHO ARE YOU?</div>
+        <div class="screen-title">YOUR ORGANISATION</div>
       </div>
       <div class="dual-knob-row">
         <div class="ctrl-panel knob-panel">
@@ -1147,92 +1147,100 @@ class HorizontalSlider {
    ============================================================ */
 const CTRL = {
   // ── Screen 0: WHO ARE YOU? ──────────────────────────────────
-  ORG_TYPE: {
-    names: ['NGO / NON-PROFIT', 'GOV / PUBLIC', 'PRIVATE STARTUP', 'BIG TECH'],
+ORG_TYPE: {
+    names: ['Community group', 'Research institute', 'Public / governmental', 'Startup', 'Mega-corporation'],
     descs: [
-      'Mission-driven organisation operating without profit motive. Accountable to its stated social purpose, but reliant on grants and donations to survive.',
-      'Publicly funded institution with democratic accountability. Subject to political pressures and procurement cycles, but with a long-term mandate.',
-      'Venture-backed company optimising for growth and scale. Answers primarily to investors. Fast-moving but financially precarious.',
-      'Established platform corporation with deep infrastructure and distribution. Significant power concentration and a track record of absorbing competitors.',
+      'A grassroots organisation built around a specific community or cause. Decisions are shaped by the people it serves, not by investors or shareholders. Sustainable but small-scale, reliant on grants and goodwill.',
+      'A university lab or research body focused on advancing knowledge. Publishes findings openly and moves carefully, but can be slow and disconnected from real-world needs.',
+      'A publicly funded body accountable to citizens through democratic processes. Priorities can shift with elections and political pressure, but it has a long-term mandate to serve the public interest.',
+      'A young, fast-moving company backed by investors who expect rapid growth. Exciting and innovative, but under constant pressure to scale quickly and generate returns, often at the expense of caution.',
+      'A dominant technology platform with enormous resources, global reach, and existing infrastructure. Capable of deploying at massive scale, but with a track record of absorbing competitors and concentrating power.',
     ],
   },
+
   ETHICAL: {
-    names: ['OPEN ETHICS', 'ETHICAL REVIEW', 'PRAGMATIC', 'GROWTH-FIRST', 'HARM-TOLERANT'],
+    names: ['Justice and rights centred', 'Transparent and careful', 'Techno-optimist', 'Growth-first', 'Harm-tolerant', 'Fully extractive'],
     descs: [
-      'All design decisions are fully documented and publicly accountable. Slowest to ship, but highest trust and lowest long-term reputational risk.',
-      'Ethical questions raised internally before deployment. Genuine intent to avoid harm, not just legal exposure.',
-      'Ethics treated as a risk management layer. Interventions happen when reputational or legal exposure is high.',
-      'Speed and market share take priority. Ethical considerations are addressed reactively rather than built into design.',
-      'Known harms accepted as an operational cost. Harm to users or communities is treated as an acceptable externality.',
+      'Every decision starts by asking who could be harmed and how to prevent it. Prioritises the rights of individuals and communities over speed or profit. The slowest approach, but the most accountable.',
+      'Design decisions are documented and reviewed before anything is released. Genuine effort to avoid causing harm, with processes in place to catch problems early. Slower to ship, but builds trust.',
+      'Believes technology is inherently a force for good and that problems can be solved by building more and better tools. Moves quickly and optimistically, sometimes without fully considering who might be left behind or hurt along the way.',
+      'Speed and market share come first. Ethical questions are dealt with after launch, usually only when something goes wrong publicly. Treats responsibility as a cost to be minimised.',
+      'Aware that the product may cause harm to some people or communities, but treats this as an acceptable trade-off for growth or profit. Problems are only addressed when they become a legal or reputational threat.',
+      'People, communities, and their data are treated purely as resources to be used. No meaningful ethical consideration at any stage. The goal is maximum extraction of value, disguised behind polished branding.',
     ],
   },
+
   FUNDING: {
-    names: ['GOVT GRANTS', 'SUBSCRIPTION', 'VENTURE CAPITAL', 'CORP SPONSOR'],
+    names: ['Government grants', 'Subscription based', 'Pay-per-use', 'Big loan', 'Rich sponsor'],
     descs: [
-      'Funded by public bodies or research councils. Reporting requirements create transparency, but priorities shift with political cycles.',
-      'Revenue comes from paying users. Sustainable if the product delivers real value, but risks excluding those who cannot pay.',
-      'Backed by investors expecting high returns. Growth targets frequently conflict with ethical or public-interest goals.',
-      'Funded by a single corporate entity. Operational independence depends entirely on sponsor priorities and goodwill.',
+      'Funded by public money through government bodies or research councils. Comes with transparency requirements and accountability, but priorities can change when the political landscape shifts.',
+      'Users pay a regular fee to access the service. Sustainable if the product genuinely helps people, but risks locking out anyone who cannot afford to pay.',
+      'Users are charged each time they use the service. Keeps the barrier to entry low, but creates pressure to maximise the number of transactions, which can conflict with user wellbeing.',
+      'Funded by borrowing a large amount of money that must be repaid with interest. Creates intense pressure to grow fast and generate revenue, often pushing the company toward short-term thinking.',
+      'Funded by a single wealthy individual or corporation. Can provide stability and freedom from market pressure, but the sponsor\'s personal values and interests inevitably shape the direction of the project.',
     ],
   },
 
-  // ── Screen 1: YOUR DATA ─────────────────────────────────────
   DATA_TYPES: {
-    names: ['GENERAL WEB', 'BOOKS / ACADEMIC', 'PROPRIETARY CLIENT', 'SOCIAL MEDIA'],
+    names: ['Web archives', 'Books and literature', 'Academic papers', 'Client / task specific', 'Social media'],
     descs: [
-      'Text scraped from the public internet. Broad and abundant, but reflects existing biases, misinformation, and power structures.',
-      'Curated published literature. Higher-quality signal, but excludes voices outside formal publishing and academic systems.',
-      'Data generated by paying customers. Highly relevant for the task, but raises questions about consent and secondary use.',
-      'User-generated content from social platforms. Rich behavioural signal, heavily skewed by engagement algorithms.',
-    ],
-  },
-  DATA_SOURCE: {
-    names: ['OPEN DATASETS', 'LICENSED', 'SCRAPED', 'CROWDSOURCED', 'SYNTHETIC'],
-    descs: [
-      'Publicly available data under open licences. Reproducible and auditable, but often limited in scope or recency.',
-      'Purchased or formally licensed from data holders. Legal clarity, but expensive and may still exclude individual consent.',
-      'Collected by automated crawling of public or semi-public sources. Efficient but frequently contested legally and ethically.',
-      'Gathered from paid workers or volunteers. Flexible and diverse, but quality depends on task design and fair compensation.',
-      'Generated by AI or simulation. No privacy risk from real individuals, but may amplify model biases if not carefully designed.',
-    ],
-  },
-  DATA_USE: {
-    names: ['UNSUPERVISED', 'HUMAN FEEDBACK', 'RULE-BASED', 'FINE-TUNED'],
-    descs: [
-      'Model learns patterns from raw data without human guidance. Scalable and cheap, but unpredictable — the model develops its own internal representations with no external correction.',
-      'Human raters score or rank model outputs, which are used to steer behaviour. More aligned with human values, but expensive and shaped by who the raters are.',
-      'Explicit rules, constitutions, or principles constrain what the model can and cannot do. Predictable and auditable, but rigid — may fail at edge cases the rules didn\'t anticipate.',
-      'A general model is retrained on a narrow, curated dataset for a specific task. Highly capable within its domain, but brittle outside it and dependent on dataset quality.',
+      'Text collected from across the internet, including news sites, blogs, forums, and wikis. Covers an enormous range of topics, but reflects whatever biases, misinformation, and power imbalances exist online.',
+      'Published novels, non-fiction, journalism, and other written works. Generally well-written and edited, but overwhelmingly represents the voices of those who get published, which skews towards certain cultures and languages.',
+      'Peer-reviewed research papers, theses, and scientific literature. High-quality and evidence-based, but written in specialist language and concentrated in well-funded research institutions.',
+      'Data generated specifically for or by the organisation\'s own users and tasks. Highly relevant to the job at hand, but raises serious questions about consent and whether people knew their data would be used this way.',
+      'Posts, comments, videos, and conversations from platforms like Twitter, TikTok, Reddit, and YouTube. Rich in everyday language and current opinions, but heavily shaped by platform algorithms and full of toxicity and misinformation.',
     ],
   },
 
-  // ── Screen 2: YOUR MODEL ────────────────────────────────────
-  MODEL_LOCATION: {
-    names: ['CLOUD', 'ON-PREMISE', 'EDGE DEVICE', 'DECENTRALISED'],
+  DATA_SOURCE: {
+    names: ['Built / collected in-house', 'Licensed / purchased', 'Crowdsourced', 'Open datasets', 'Synthetic', 'Scraped'],
     descs: [
-      'Hosted on AWS, Azure, or GCP. Scales easily but creates dependency on Big Tech infrastructure and puts data in third-party hands.',
-      'Runs on organisation-owned servers. Full data control and no cloud dependency, but high upfront cost and maintenance burden.',
-      'Runs on the user\'s own device. Maximum privacy — data never leaves the user — but severely constrains model size.',
-      'Distributed across peer nodes. No single point of failure, but governance is hard and output quality is inconsistent.',
+      'The organisation creates or gathers its own data directly, with full control over quality and consent. Slow and expensive, but the most transparent and accountable approach.',
+      'Data bought or formally licensed from whoever owns it. Legally clear, but expensive and still may not involve meaningful consent from the people the data is actually about.',
+      'Gathered from paid workers or volunteers who contribute data knowingly. Can be diverse and flexible, but the quality depends on how well the task is designed and whether contributors are fairly compensated.',
+      'Publicly available datasets released under open licences by researchers or institutions. Anyone can inspect and reproduce the work, but these datasets are often limited in scope and can become outdated.',
+      'Artificial data generated by other AI models or simulations. No privacy risk to real people, but if the AI that made it had biases, those biases get baked in and can compound over time.',
+      'Collected by automated tools that crawl websites and download content without asking permission. Fast and cheap, but legally contested and ethically questionable, since the people who created the content had no say.',
     ],
   },
+
+  DATA_USE: {
+    names: ['Unsupervised', 'Human feedback', 'Rule-based', 'Fine-tuned'],
+    descs: [
+      'The model teaches itself by finding patterns in raw data with no human guidance. Cheap and scalable, but unpredictable. The model decides for itself what matters, and nobody fully knows what it has learned.',
+      'People review and score the model\'s outputs, and those scores are used to steer its behaviour. Produces more human-aligned results, but is expensive and shaped by who the reviewers are and what they believe is correct.',
+      'The model is given explicit rules or principles it must follow. Predictable and easy to audit, but rigid. It can struggle with situations the rules did not anticipate.',
+      'A general-purpose model is retrained on a smaller, carefully chosen dataset for a specific job. Very capable within its narrow area, but can break in unexpected ways outside it.',
+    ],
+  },
+
+  MODEL_LOCATION: {
+    names: ['Runs on devices locally', 'Hosted by the organisation', 'Decentralised', 'Outsourced to third party'],
+    descs: [
+      'The model runs on the user\'s own phone, laptop, or local hardware. Maximum privacy because data never leaves the device, but only small models can run this way and performance depends on the user\'s hardware.',
+      'The organisation runs the model on its own servers and hardware. Full control over the data and no dependency on outside companies, but requires significant upfront investment and ongoing maintenance.',
+      'The model is spread across many independent computers run by different people or groups. No single point of control or failure, but coordination is difficult and output quality can be inconsistent.',
+      'The model is accessed through a big tech company\'s cloud service like Amazon, Google, or Microsoft. Easy to scale and maintain, but the organisation\'s data passes through someone else\'s infrastructure and is subject to their terms.',
+    ],
+  },
+
   MODEL_SIZE: {
     names: ['1B', '7B', '14B', '80B', '140B'],
     descs: [
-      'Runs on a laptop CPU. Near-instant inference, negligible energy cost. Suitable only for narrow, well-defined tasks.',
-      'Runs on a consumer GPU (8GB VRAM). Competent at focused language tasks. Minimum viable for most deployed products.',
-      'Runs on a 16GB GPU or slowly on a laptop. More capable, but energy cost starts to matter.',
-      'Requires a dedicated GPU server or cloud instance. Strong reasoning. Only accessible to organisations with real infrastructure budgets.',
-      'Needs multi-GPU infrastructure. Near-frontier performance. High energy and cooling costs, beyond most organisations\' reach.',
+      'A very small model that can run on an ordinary laptop without a graphics card. Responds almost instantly and uses minimal energy. Good for simple, repetitive tasks but struggles with anything complex or open-ended.',
+      'A mid-size model that needs a decent graphics card to run (the kind found in a gaming PC). Capable enough for most focused tasks like summarising, translating, or answering questions within a specific topic.',
+      'A larger model that needs a powerful graphics card or a small server. Noticeably better at reasoning and handling nuance, but the energy cost starts to add up and it is beyond what most individuals can run.',
+      'A large model that requires dedicated server hardware, typically only available to well-funded organisations. Strong at complex reasoning and creative tasks. Significant energy and cooling costs.',
+      'A frontier-scale model that needs multiple high-end servers working together. Near the cutting edge of what AI can do, but with substantial energy consumption and costs that put it out of reach for all but the largest companies.',
     ],
   },
+
   SYSTEM_PROMPT: {
-    names: ['OPEN / TRANSPARENT', 'LIGHTLY GUIDED', 'COMMERCIALLY OPTIMISED', 'RESTRICTED'],
+    names: ['Safety first', 'Balanced', 'User configurable'],
     descs: [
-      'The system prompt is published. Users know exactly how the model is instructed. High trust, easier to find workarounds.',
-      'A minimal prompt sets basic tone and safety guardrails. Behaviour mostly determined by the underlying model.',
-      'Prompted to steer users toward paid features, retention, or upsell. Transparency is low by design.',
-      'Heavy restrictions limit what the model can discuss. Used for compliance, but can infantilise users or hide relevant information.',
+      'The model is instructed to be cautious above all else. It will refuse requests it considers risky and err on the side of saying no. Safest for the organisation, but can feel restrictive and may refuse to help with perfectly reasonable tasks.',
+      'A middle ground between safety and usefulness. The model has guardrails for clearly harmful requests but tries to be as helpful as possible within those limits. Most users will find this strikes a reasonable balance.',
+      'Users can set their own rules for how the model behaves. Maximum freedom and flexibility, but some users may remove safety measures entirely, and the organisation has less control over how the model is used.',
     ],
   },
 };
