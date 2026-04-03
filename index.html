@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Build Your Speculative AI Company</title>
+<title>Paper Trail</title>
 <style>
 /* ============================================================
    DESIGN TOKENS
@@ -626,7 +626,7 @@ html, body {
 
   <!-- STATUS BAR -->
   <div id="status-bar">
-    <div id="app-title">BUILD YOUR SPECULATIVE AI COMPANY</div>
+    <div id="app-title">PAPER TRAIL</div>
     <div id="progress-bar"></div>
     <div id="serial-indicator" title="Arduino connection status">
       <span id="serial-dot">&#9679;</span>
@@ -675,13 +675,13 @@ html, body {
       </div>
       <div class="dual-knob-row">
         <div class="ctrl-panel knob-panel">
-          <div class="ctrl-label">DATA TYPES</div>
+          <div class="ctrl-label">DATA TYPE</div>
           <div class="dial-wrapper" id="s1k1-dial"></div>
           <div class="ctrl-name" id="s1k1-name"></div>
           <div class="ctrl-desc" id="s1k1-desc"></div>
         </div>
         <div class="ctrl-panel knob-panel">
-          <div class="ctrl-label">DATA USE</div>
+          <div class="ctrl-label">TRAINING TYPE</div>
           <div class="dial-wrapper" id="s1k2-dial"></div>
           <div class="ctrl-name" id="s1k2-name"></div>
           <div class="ctrl-desc" id="s1k2-desc"></div>
@@ -697,11 +697,11 @@ html, body {
       </div>
     </div>
 
-    <!-- SCREEN 2: YOUR MODEL -->
+    <!-- SCREEN 2: YOUR AI MODEL -->
     <div id="screen-2" class="screen-panel">
       <div class="screen-header">
         <div class="screen-num">03 / 03</div>
-        <div class="screen-title">YOUR MODEL</div>
+        <div class="screen-title">YOUR AI MODEL</div>
       </div>
       <div class="dual-knob-row">
         <div class="ctrl-panel knob-panel">
@@ -719,7 +719,7 @@ html, body {
       </div>
       <div class="slider-row">
         <div class="ctrl-panel slider-panel">
-          <div class="ctrl-label">MODEL SIZE</div>
+          <div class="ctrl-label">MODEL SIZE (Billions of Parameters)</div>
           <div class="slider-wrap" id="s2sl-wrap"></div>
           <div class="ctrl-name" id="s2sl-name"></div>
           <div class="ctrl-desc" id="s2sl-desc"></div>
@@ -1258,6 +1258,7 @@ const state = {
   envScore:     5,
   socialScore:  5,
   pracScore:    5,
+  receiptId:    null,
   // Active hardware controls for current screen
   activeKnob1:  null,
   activeKnob2:  null,
@@ -1493,6 +1494,7 @@ async function generateFinal() {
   const overlay  = document.getElementById('gen-overlay');
   const storyEl  = document.getElementById('gen-story');
   storyEl.textContent = '';
+  state.receiptId = null;
   overlay.classList.add('active');
 
   const payload = {
@@ -1519,22 +1521,29 @@ async function generateFinal() {
   try {
     let fullBuf = '';
     let scoresExtracted = false;
+    let receiptIdExtracted = false;
 
     await streamLLM('/api/generate', payload, (buf) => {
       fullBuf = buf;
-      // Extract scores from first line
-      if (!scoresExtracted && buf.includes('\n')) {
-        const firstLine = buf.split('\n')[0];
-        if (firstLine.startsWith('__SCORES__:')) {
-          const parts = firstLine.replace('__SCORES__:', '').split(',');
-          state.envScore   = parseInt(parts[0]) || 5;
-          state.socialScore = parseInt(parts[1]) || 5;
-          state.pracScore  = parseInt(parts[2]) || 5;
+      // Extract metadata from stream preamble.
+      if (!scoresExtracted) {
+        const m = buf.match(/^__SCORES__:(\d+),(\d+),(\d+)$/m);
+        if (m) {
+          state.envScore    = parseInt(m[1]) || 5;
+          state.socialScore = parseInt(m[2]) || 5;
+          state.pracScore   = parseInt(m[3]) || 5;
           scoresExtracted = true;
         }
       }
+      if (!receiptIdExtracted) {
+        const m = buf.match(/^__RECEIPT_ID__:(.+)$/m);
+        if (m) {
+          state.receiptId = m[1].trim();
+          receiptIdExtracted = true;
+        }
+      }
       // Show story in overlay as it streams
-      const rest = buf.replace(/^__SCORES__:[^\n]*\n/, '');
+      const rest = buf.replace(/^__(?:SCORES|RECEIPT_ID)__:[^\n]*\n/gm, '');
       const m = rest.match(/STORY:\s*([\s\S]*?)(?=\n+(?:ENV|SOCIAL|PRACTICALITY)[^\n]*SUMMARY:|$)/i);
       if (m) storyEl.textContent = m[1].trim();
     });
@@ -1546,7 +1555,13 @@ async function generateFinal() {
     await autoSaveAndPrintReceipt();
   } catch (e) {
     overlay.classList.remove('active');
-    renderReceipt({ story: 'Could not reach Ollama. Is it running?', envSummary: '', socialSummary: '', practicalitySummary: '' });
+    renderReceipt({
+      story: 'Could not reach Ollama. Is it running?',
+      envSummary: '',
+      socialSummary: '',
+      practicalitySummary: '',
+      receiptId: state.receiptId,
+    });
     showScreen(3);
     await autoSaveAndPrintReceipt();
   }
@@ -1556,7 +1571,8 @@ async function generateFinal() {
    PARSE HELPERS
    ============================================================ */
 function parseFinal(text) {
-  const clean = text.replace(/^__SCORES__:[^\n]*\n/, '');
+  const rid = ((text.match(/^__RECEIPT_ID__:(.+)$/m) || [])[1] || state.receiptId || '').trim();
+  const clean = text.replace(/^__(?:SCORES|RECEIPT_ID)__:[^\n]*\n/gm, '');
   // Stop story before any summary keyword regardless of exact wording
   const story = (clean.match(
     /STORY:\s*([\s\S]*?)(?=\n+(?:ENV|SOCIAL|PRACTICALITY)[^\n]*SUMMARY:)/i
@@ -1570,6 +1586,7 @@ function parseFinal(text) {
     envSummary:          envSum.trim(),
     socialSummary:       socSum.trim(),
     practicalitySummary: pracSum.trim(),
+    receiptId:           rid,
   };
 }
 
@@ -1635,8 +1652,11 @@ function renderReceipt(data) {
   const prac = state.pracScore;
 
   body.innerHTML = `
+    <div class="r-center r-small" style="margin-bottom:2px;color:#777;">
+      RECEIPT ID: ${data.receiptId || 'PT-?????'}
+    </div>
     <div class="r-center r-bold" style="letter-spacing:2px;font-size:10px;margin-bottom:6px;">
-      BUILD YOUR SPECULATIVE AI COMPANY
+      PAPER TRAIL
     </div>
     <hr class="r-divider-d">
 
@@ -1658,9 +1678,9 @@ function renderReceipt(data) {
 
     <hr class="r-divider">
 
-    ${makeScoreBlock('ENVIRONMENTAL IMPACT', env,  data.envSummary)}
-    ${makeScoreBlock('SOCIAL IMPACT',        soc,  data.socialSummary)}
-    ${makeScoreBlock('PRACTICALITY',         prac, data.practicalitySummary)}
+    ${makeScoreBlock('ENVIRONMENTAL RATING', env,  data.envSummary)}
+    ${makeScoreBlock('SOCIAL RATING',        soc,  data.socialSummary)}
+    ${makeScoreBlock('PRACTICALITY RATING',  prac, data.practicalitySummary)}
 
     <hr class="r-divider">
 
@@ -1715,6 +1735,7 @@ function startOver() {
     dataTypesIdx: 0, dataSourceIdx: 2, dataUseIdx: 0,
     modelLocationIdx: 0, modelSizeIdx: 2, systemPromptIdx: 0,
     envScore: 5, socialScore: 5, pracScore: 5,
+    receiptId: null,
     activeKnob1: null, activeKnob2: null, activeSlider: null,
   });
   screenInited.clear();
@@ -1953,6 +1974,7 @@ async function printReceipt() {
       social_summary:        _receiptData.socialSummary        || '',
       practicality_summary:  _receiptData.practicalitySummary  || '',
       story:                 _receiptData.story                || '',
+      receipt_id:            _receiptData.receiptId            || state.receiptId || '',
     };
     const r = await fetch('/api/print', {
       method: 'POST',
@@ -1985,7 +2007,10 @@ async function saveReceiptPngToWorkspace() {
     const r = await fetch('/api/save-receipt-png', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data_url: dataUrl }),
+      body: JSON.stringify({
+        data_url: dataUrl,
+        receipt_id: (_receiptData && _receiptData.receiptId) || state.receiptId || '',
+      }),
     });
     const result = await r.json();
     if (!result.ok) throw new Error(result.error || 'unknown save error');

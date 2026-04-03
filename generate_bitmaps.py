@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate 10 score dial bitmaps (scores 1-10) for the Arduino thermal printer sketch.
-Output: arduino/speculative_ai/bitmaps.h
+Output: arduino/paper_trail/bitmaps.h
 
 Run:  python generate_bitmaps.py
 Requires: pip install Pillow
@@ -93,7 +93,7 @@ def img_to_bytes(img: Image.Image) -> list:
 
 def main():
     out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                           "arduino", "speculative_ai")
+                           "arduino", "paper_trail")
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, "bitmaps.h")
 
@@ -132,7 +132,7 @@ def main():
         f.write("\n};\n")
 
     print(f"\nWrote {out_path}")
-    print("Now recompile and upload arduino/speculative_ai/speculative_ai.ino")
+    print("Now recompile and upload arduino/paper_trail/paper_trail.ino")
 
 
 if __name__ == "__main__":

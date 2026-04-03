@@ -2,6 +2,7 @@ import csv
 import base64
 import json
 import os
+import re
 import textwrap
 import threading
 import time
@@ -127,6 +128,8 @@ GENERATION_MODEL = "llama3.2:3b"   # change this to use a different model
 INDEX_PATH  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
 SCORES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scores.csv")
 RECEIPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "receipt_pngs")
+RECEIPT_COUNTER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "receipt_counter.txt")
+_receipt_id_lock = threading.Lock()
 
 # ── Load scoring CSV ──────────────────────────────────────────────────────────
 _scores = {}
@@ -151,6 +154,22 @@ def _load_scores():
 
 _load_scores()
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def _next_receipt_id():
+    """Increment and return the next sequential Paper Trail receipt ID."""
+    with _receipt_id_lock:
+        current = 0
+        if os.path.exists(RECEIPT_COUNTER_PATH):
+            try:
+                with open(RECEIPT_COUNTER_PATH, "r") as f:
+                    current = int(f.read().strip() or "0")
+            except (ValueError, OSError):
+                current = 0
+        current += 1
+        with open(RECEIPT_COUNTER_PATH, "w") as f:
+            f.write(str(current))
+    return f"PT-{current:05d}"
 
 
 def compute_scores(choices):
@@ -260,6 +279,7 @@ def generate():
         ("s3_knob2",  data.get("system_prompt_idx",0)),
     ]
     env_score, social_score, prac_score = compute_scores(choices)
+    receipt_id = _next_receipt_id()
 
     prompt = (
         "You are a speculative fiction analyst. Based on these AI organisation design choices, "
@@ -289,6 +309,7 @@ def generate():
     def gen_with_scores():
         # Emit scores header first so the frontend can extract them synchronously
         yield f"__SCORES__:{env_score},{social_score},{prac_score}\n"
+        yield f"__RECEIPT_ID__:{receipt_id}\n"
         yield from stream_ollama(prompt, num_predict=450, temperature=0.7)
 
     return streamed(gen_with_scores())
@@ -325,6 +346,7 @@ def set_port():
 def save_receipt_png():
     data = request.get_json() or {}
     data_url = data.get("data_url", "")
+    receipt_id = data.get("receipt_id", "")
     if not isinstance(data_url, str) or not data_url.startswith("data:image/png;base64,"):
         return {"ok": False, "error": "Invalid PNG data URL"}, 400
     try:
@@ -332,7 +354,8 @@ def save_receipt_png():
         b64 = data_url.split(",", 1)[1]
         png_bytes = base64.b64decode(b64)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        filename = f"speculative_ai_receipt_{ts}.png"
+        rid = re.sub(r"[^A-Za-z0-9_-]", "", str(receipt_id)) if receipt_id else ""
+        filename = f"paper_trail_{rid}_{ts}.png" if rid else f"paper_trail_receipt_{ts}.png"
         path = os.path.join(RECEIPTS_DIR, filename)
         with open(path, "wb") as f:
             f.write(png_bytes)
@@ -345,6 +368,7 @@ def _build_print_commands(data):
     """Return ordered list of Arduino print command strings for one receipt."""
     WRAP = 32   # characters per line at small font
     DASH_LINE = "TEXT:--------------------------------"
+    receipt_id = str(data.get("receipt_id", "PT-?????"))
 
     def wrap(text):
         return textwrap.wrap(str(text), WRAP) or [""]
@@ -353,9 +377,9 @@ def _build_print_commands(data):
     cmds.append("PRINT_START")
 
     # ── Header ────────────────────────────────────────────────────────────────
-    cmds += ["ALIGN:C", "BOLD_ON", "SIZE:S",
-             "TEXT:BUILD YOUR SPECULATIVE",
-             "TEXT:AI COMPANY",
+    cmds += ["ALIGN:C", "SIZE:S",
+             f"TEXT:RECEIPT ID: {receipt_id}",
+             "BOLD_ON", "TEXT:PAPER TRAIL",
              "BOLD_OFF", "ALIGN:L", DASH_LINE]
 
     # ── Company name field ────────────────────────────────────────────────────
@@ -379,9 +403,9 @@ def _build_print_commands(data):
 
     # ── Score blocks ──────────────────────────────────────────────────────────
     score_sections = [
-        ("ENVIRONMENTAL IMPACT", data.get("env_score",    5), data.get("env_summary",    "")),
-        ("SOCIAL IMPACT",        data.get("social_score", 5), data.get("social_summary", "")),
-        ("PRACTICALITY",         data.get("prac_score",   5), data.get("practicality_summary", "")),
+        ("ENVIRONMENTAL RATING", data.get("env_score",    5), data.get("env_summary",    "")),
+        ("SOCIAL RATING",        data.get("social_score", 5), data.get("social_summary", "")),
+        ("PRACTICALITY RATING",  data.get("prac_score",   5), data.get("practicality_summary", "")),
     ]
     for title, score, summary in score_sections:
         score = int(score)
@@ -470,7 +494,7 @@ def print_receipt():
 
 
 if __name__ == "__main__":
-    print(f"Starting Build Your Speculative AI Company at http://localhost:5002")
+    print(f"Starting Paper Trail at http://localhost:5002")
     print(f"Using model: {GENERATION_MODEL}")
     print(f"Ollama expected at: {OLLAMA_URL}")
     app.run(debug=True, port=5002, use_reloader=False)

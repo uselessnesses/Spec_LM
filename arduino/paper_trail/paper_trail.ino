@@ -1,8 +1,8 @@
 /*
- * speculative_ai.ino
- * VERSION: 006 (2026-04-02)
+ * paper_trail.ino
+ * VERSION: 007 (2026-04-02)
  * ---------------------------------------------------------
- * Build Your Speculative AI Company — Arduino Mega sketch
+ * Paper Trail — Arduino Mega sketch
  *
  * Dual role:
  *   1. Sensor reader: continuously sends A0,A1,A4 over USB serial
