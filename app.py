@@ -127,16 +127,56 @@ GENERATION_MODEL = "llama3.2:3b"   # change this to use a different model
 
 INDEX_PATH  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
 SCORES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scores.csv")
+OPTIONS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "paper_trail_options.csv")
 RECEIPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "receipt_pngs")
 RECEIPT_COUNTER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "receipt_counter.txt")
 _receipt_id_lock = threading.Lock()
 
-# ── Load scoring CSV ──────────────────────────────────────────────────────────
+# ── Load option copy + scoring CSV ───────────────────────────────────────────
 _scores = {}
+_option_controls = {}
 
 
-def _load_scores():
-    global _scores
+def _load_option_config():
+    """
+    Load canonical option copy + scores from paper_trail_options.csv.
+    Falls back to scores.csv (scores only) if needed.
+    """
+    global _scores, _option_controls
+    _scores = {}
+    _option_controls = {}
+
+    if os.path.exists(OPTIONS_PATH):
+        with open(OPTIONS_PATH, newline='') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                control_id = row.get('control_id', '').strip()
+                control_key = row.get('control_key', '').strip()
+                option_index = int(row['option_index'])
+                option_label = row.get('option_label', '').strip()
+                option_desc = row.get('option_desc', '').strip()
+
+                _scores[(control_id, option_index)] = {
+                    'env':          int(row['env_score']),
+                    'social':       int(row['social_score']),
+                    'practicality': int(row['practicality_score']),
+                }
+
+                if control_key:
+                    if control_key not in _option_controls:
+                        _option_controls[control_key] = {"names": [], "descs": []}
+                    names = _option_controls[control_key]["names"]
+                    descs = _option_controls[control_key]["descs"]
+                    while len(names) <= option_index:
+                        names.append("")
+                        descs.append("")
+                    names[option_index] = option_label
+                    descs[option_index] = option_desc
+
+        print(f"[CONFIG] Loaded {len(_scores)} scored options from paper_trail_options.csv")
+        return
+
+    # Fallback: keep app functional even if canonical file is missing
     if not os.path.exists(SCORES_PATH):
         print(f"[SCORES] {SCORES_PATH} not found — all scores default to 5")
         return
@@ -149,10 +189,10 @@ def _load_scores():
                 'social':       int(row['social_score']),
                 'practicality': int(row['practicality_score']),
             }
-    print(f"[SCORES] Loaded {len(_scores)} entries from scores.csv")
+    print(f"[SCORES] Loaded {len(_scores)} entries from scores.csv (fallback)")
 
 
-_load_scores()
+_load_option_config()
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -181,9 +221,9 @@ def compute_scores(choices):
         pracs.append(s['practicality'])
     if not envs:
         return 5, 5, 5
-    env  = max(1, min(10, round(sum(envs) / len(envs))))
-    soc  = max(1, min(10, round(sum(socs) / len(socs))))
-    prac = max(1, min(10, round(sum(pracs) / len(pracs))))
+    env  = max(0, min(10, round(sum(envs) / len(envs))))
+    soc  = max(0, min(10, round(sum(socs) / len(socs))))
+    prac = max(0, min(10, round(sum(pracs) / len(pracs))))
     return env, soc, prac
 
 
@@ -293,17 +333,17 @@ def generate():
         f"MODEL SIZE: {model_size}\n"
         f"MODEL LOCATION: {model_loc}\n"
         f"SYSTEM PROMPT STYLE: {sys_prompt}\n\n"
-        "Pre-computed scores (do not change these numbers — write summaries that explain them):\n"
-        f"  Environmental impact: {env_score}/10\n"
-        f"  Social impact: {social_score}/10\n"
-        f"  Practicality/sustainability: {prac_score}/10\n\n"
+        "Pre-computed ratings (0 = bad, 10 = good). Do not change these numbers:\n"
+        f"  Environmental rating: {env_score}/10\n"
+        f"  Social rating: {social_score}/10\n"
+        f"  Practicality rating: {prac_score}/10\n\n"
         "Respond in EXACTLY this format:\n\n"
         "STORY:\n"
         "[2 sentences maximum. Speculative narrative of this organisation's arc — its peak and most likely end. "
         "Be specific to the choices made. Be matter-of-fact, not preachy.]\n\n"
-        f"ENV_SUMMARY: [10-12 words explaining the {env_score}/10 environmental impact score]\n\n"
-        f"SOCIAL_SUMMARY: [10-12 words explaining the {social_score}/10 social impact score]\n\n"
-        f"PRACTICALITY_SUMMARY: [10-12 words explaining the {prac_score}/10 practicality score]"
+        f"ENV_SUMMARY: [10-12 words explaining the {env_score}/10 environmental rating]\n\n"
+        f"SOCIAL_SUMMARY: [10-12 words explaining the {social_score}/10 social rating]\n\n"
+        f"PRACTICALITY_SUMMARY: [10-12 words explaining the {prac_score}/10 practicality rating]"
     )
 
     def gen_with_scores():
@@ -331,6 +371,11 @@ def list_ports():
         })
     ports.sort(key=lambda x: (not x["likely_arduino"], x["device"]))
     return {"ports": ports}
+
+
+@app.route("/api/options")
+def options_config():
+    return {"controls": _option_controls}
 
 
 @app.route("/api/set-port", methods=["POST"])

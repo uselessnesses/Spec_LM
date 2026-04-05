@@ -1145,7 +1145,7 @@ class HorizontalSlider {
 /* ============================================================
    STATIC CONTROL DATA
    ============================================================ */
-const CTRL = {
+let CTRL = {
   // ── Screen 0: WHO ARE YOU? ──────────────────────────────────
 ORG_TYPE: {
     names: ['Community group', 'Research institute', 'Public / governmental', 'Startup', 'Mega-corporation'],
@@ -1312,14 +1312,43 @@ function setName(nameId, text) {
   if (el) el.textContent = text;
 }
 
+function clampIndex(i, n) {
+  if (n <= 0) return 0;
+  return Math.max(0, Math.min(i, n - 1));
+}
+
+function applyOptionsConfig(controls) {
+  if (!controls || typeof controls !== 'object') return;
+  for (const [key, cfg] of Object.entries(controls)) {
+    if (!CTRL[key]) continue;
+    if (Array.isArray(cfg.names) && cfg.names.length) CTRL[key].names = cfg.names;
+    if (Array.isArray(cfg.descs) && cfg.descs.length) CTRL[key].descs = cfg.descs;
+  }
+}
+
+async function loadOptionsConfig() {
+  try {
+    const r = await fetch('/api/options');
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data && data.controls) applyOptionsConfig(data.controls);
+  } catch (_) {
+    // Keep built-in CTRL copy as fallback.
+  }
+}
+
 /* ============================================================
    SCREEN INIT FUNCTIONS
    ============================================================ */
 function initScreen0() {
+  state.orgTypeIdx = clampIndex(state.orgTypeIdx, CTRL.ORG_TYPE.names.length);
+  state.fundingIdx = clampIndex(state.fundingIdx, CTRL.FUNDING.names.length);
+  state.ethicalIdx = clampIndex(state.ethicalIdx, CTRL.ETHICAL.names.length);
+
   // Knob 1: Org type
   state.activeKnob1 = new RotaryDial({
     container: document.getElementById('s0k1-dial'),
-    n: 4,
+    n: CTRL.ORG_TYPE.names.length,
     size: 150,
     onChange: (i) => {
       state.orgTypeIdx = i;
@@ -1332,7 +1361,7 @@ function initScreen0() {
   // Knob 2: Funding
   state.activeKnob2 = new RotaryDial({
     container: document.getElementById('s0k2-dial'),
-    n: 4,
+    n: CTRL.FUNDING.names.length,
     size: 150,
     onChange: (i) => {
       state.fundingIdx = i;
@@ -1345,7 +1374,7 @@ function initScreen0() {
   // Slider: Ethical framework
   state.activeSlider = new HorizontalSlider({
     container:  document.getElementById('s0sl-wrap'),
-    positions:  5,
+    positions:  CTRL.ETHICAL.names.length,
     showLabels: false,
     onChange: (i) => {
       state.ethicalIdx = i;
@@ -1357,10 +1386,14 @@ function initScreen0() {
 }
 
 function initScreen1() {
+  state.dataTypesIdx = clampIndex(state.dataTypesIdx, CTRL.DATA_TYPES.names.length);
+  state.dataUseIdx = clampIndex(state.dataUseIdx, CTRL.DATA_USE.names.length);
+  state.dataSourceIdx = clampIndex(state.dataSourceIdx, CTRL.DATA_SOURCE.names.length);
+
   // Knob 1: Data types
   state.activeKnob1 = new RotaryDial({
     container: document.getElementById('s1k1-dial'),
-    n: 4,
+    n: CTRL.DATA_TYPES.names.length,
     size: 150,
     onChange: (i) => {
       state.dataTypesIdx = i;
@@ -1373,7 +1406,7 @@ function initScreen1() {
   // Knob 2: Data use
   state.activeKnob2 = new RotaryDial({
     container: document.getElementById('s1k2-dial'),
-    n: 4,
+    n: CTRL.DATA_USE.names.length,
     size: 150,
     onChange: (i) => {
       state.dataUseIdx = i;
@@ -1386,7 +1419,7 @@ function initScreen1() {
   // Slider: Data source
   state.activeSlider = new HorizontalSlider({
     container:  document.getElementById('s1sl-wrap'),
-    positions:  5,
+    positions:  CTRL.DATA_SOURCE.names.length,
     showLabels: false,
     onChange: (i) => {
       state.dataSourceIdx = i;
@@ -1398,10 +1431,14 @@ function initScreen1() {
 }
 
 function initScreen2() {
+  state.modelLocationIdx = clampIndex(state.modelLocationIdx, CTRL.MODEL_LOCATION.names.length);
+  state.systemPromptIdx = clampIndex(state.systemPromptIdx, CTRL.SYSTEM_PROMPT.names.length);
+  state.modelSizeIdx = clampIndex(state.modelSizeIdx, CTRL.MODEL_SIZE.names.length);
+
   // Knob 1: Model location
   state.activeKnob1 = new RotaryDial({
     container: document.getElementById('s2k1-dial'),
-    n: 4,
+    n: CTRL.MODEL_LOCATION.names.length,
     size: 150,
     onChange: (i) => {
       state.modelLocationIdx = i;
@@ -1414,7 +1451,7 @@ function initScreen2() {
   // Knob 2: System prompt
   state.activeKnob2 = new RotaryDial({
     container: document.getElementById('s2k2-dial'),
-    n: 4,
+    n: CTRL.SYSTEM_PROMPT.names.length,
     size: 150,
     onChange: (i) => {
       state.systemPromptIdx = i;
@@ -1427,7 +1464,7 @@ function initScreen2() {
   // Slider: Model size
   state.activeSlider = new HorizontalSlider({
     container:  document.getElementById('s2sl-wrap'),
-    positions:  5,
+    positions:  CTRL.MODEL_SIZE.names.length,
     showLabels: true,
     labels:     CTRL.MODEL_SIZE.names,
     onChange: (i) => {
@@ -1932,7 +1969,8 @@ function startKnobPoll() {
 /* ============================================================
    INIT
    ============================================================ */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadOptionsConfig();
   buildProgressBar();
   startKnobPoll();
   startSerialStatusPoll();

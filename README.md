@@ -196,7 +196,7 @@ After generation, the output shows:
 
 - A blank **Company Name** field (write on the printed receipt)
 - Your full spec summary (org type, ethics, funding, data, model)
-- Three ratings — **Environmental**, **Social**, **Practicality/Sustainability** (1–10, from `scores.csv`)
+- Three ratings — **Environmental**, **Social**, **Practicality/Sustainability** (0–10, from CSV config)
 - A 10–12 word summary beneath each score explaining it
 - A 2-sentence **speculative narrative** about the organisation's arc
 - A blank **Your Response** field (write your reaction on the printed receipt)
@@ -205,15 +205,13 @@ After generation, the output shows:
 Each generated receipt is auto-printed once and auto-saved as a PNG in `receipt_pngs/`.  
 Use **PRINT** to create an extra copy.
 
-### Tuning the scores
+### Tuning copy + scores
 
-Open `scores.csv` to adjust how each design choice affects the three scores. Each row covers one option of one control. Scores are integers 1–10.
+Open `paper_trail_options.csv` to edit the interaction option labels/descriptions and all three rating values.  
+This is the canonical file used by the app for both interface copy and scoring.
 
-```
-control,option_index,option_label,env_score,social_score,practicality_score
-s1_knob1,0,NGO / Non-profit,7,9,4
-...
-```
+- Ratings are integers **0–10** (`0 = bad`, `10 = good`).
+- `scores.csv` is kept as a compatibility export for tooling that still expects the old format.
 
 ---
 
@@ -241,5 +239,6 @@ Edit `GENERATION_MODEL` in `app.py`. `llama3.2:3b` is fast; `qwen2.5:7b` produce
 | File         | Purpose                                                                                                                                  |
 |--------------|------------------------------------------------------------------------------------------------------------------------------------------|
 | `app.py`     | Flask backend — serial reader, `/api/knob`, `/api/serial-status`, `/api/list-ports`, `/api/set-port`, `/api/generate`, `/api/print`, `/api/save-receipt-png`, receipt ID generation, CSV score loader |
-| `scores.csv` | Scoring weights for all 9 controls × 3 rating dimensions                                                                                 |
+| `paper_trail_options.csv` | Canonical control data + option copy + env/social/practicality ratings (editable)                                         |
+| `scores.csv` | Compatibility score export (`control, option_index, option_label, env_score, social_score, practicality_score`)                           |
 | `index.html` | Complete single-file frontend — HTML, CSS, and JS inline, no build step                                                                  |
