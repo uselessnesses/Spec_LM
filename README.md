@@ -8,7 +8,7 @@ The output appears as a thermal printer receipt. A PNG copy is auto-saved to `re
 
 ## Quick Start (no hardware)
 
-The app runs fully in a browser without any Arduino attached. The physical knobs and slider are optional.
+The app runs fully in a browser without any Arduino attached. The physical knobs, slider, and navigation buttons are optional.
 
 ```bash
 # 1. Install Python dependencies
@@ -102,6 +102,23 @@ Use pins **1, 2, 3** — not the primed variants (1′, 2′, 3′).
 | Pin 2 (middle / wiper) | A4          |
 | Pin 3 (right)          | 5V          |
 
+### Navigation buttons (optional)
+
+Add three normally-open push buttons for hardware navigation.
+
+- The sketch uses `INPUT_PULLUP`, so each button should connect:
+- One side to the Arduino digital pin
+- The other side to `GND`
+- Pressed = `LOW` electrically (interpreted as pressed in software)
+
+| Button function         | Arduino pin |
+|-------------------------|-------------|
+| Back (previous page)    | D7          |
+| Next / Generate         | D8          |
+| Reset (browser refresh) | D9          |
+
+For 4-leg tactile/panel buttons: use one leg from each internally-connected pair (effectively across the switch), not two legs on the same side.
+
 ### 5. Run the app
 
 ```bash
@@ -188,6 +205,12 @@ Each screen shows two knob panels (top row) and one slider panel (bottom row). A
 
 Press **GENERATE** on screen 3 to produce the receipt.
 
+Hardware button behavior matches the on-screen flow:
+
+- **Back (D7):** previous screen
+- **Next (D8):** next screen, or **Generate** on screen 3
+- **Reset (D9):** refreshes the browser page
+
 ---
 
 ## The Receipt
@@ -238,7 +261,7 @@ Edit `GENERATION_MODEL` in `app.py`. `llama3.2:3b` is fast; `qwen2.5:7b` produce
 
 | File         | Purpose                                                                                                                                  |
 |--------------|------------------------------------------------------------------------------------------------------------------------------------------|
-| `app.py`     | Flask backend — serial reader, `/api/knob`, `/api/serial-status`, `/api/list-ports`, `/api/set-port`, `/api/generate`, `/api/print`, `/api/save-receipt-png`, receipt ID generation, CSV score loader |
+| `app.py`     | Flask backend — serial reader (knobs, slider, and nav button states), `/api/knob`, `/api/serial-status`, `/api/list-ports`, `/api/set-port`, `/api/generate`, `/api/print`, `/api/save-receipt-png`, receipt ID generation, CSV score loader |
 | `paper_trail_options.csv` | Canonical control data + option copy + env/social/practicality ratings (editable)                                         |
 | `scores.csv` | Compatibility score export (`control, option_index, option_label, env_score, social_score, practicality_score`)                           |
 | `index.html` | Complete single-file frontend — HTML, CSS, and JS inline, no build step                                                                  |

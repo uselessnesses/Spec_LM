@@ -36,6 +36,9 @@ _slider_raw    = 512
 _knob_smooth   = 512.0
 _knob2_smooth  = 512.0
 _slider_smooth = 512.0
+_btn_back      = 0
+_btn_next      = 0
+_btn_reset     = 0
 SMOOTH_ALPHA   = 0.25
 _serial_lock          = threading.Lock()
 _serial_io_lock       = threading.Lock()
@@ -60,6 +63,7 @@ def _list_candidate_ports():
 def _serial_reader():
     global _knob_value, _knob2_value, _slider_value
     global _knob_raw, _knob2_raw, _slider_raw
+    global _btn_back, _btn_next, _btn_reset
     global _knob_smooth, _knob2_smooth, _slider_smooth
     global _serial_status, _user_port_override, _ser_obj
     if not _SERIAL_AVAILABLE:
@@ -96,10 +100,17 @@ def _serial_reader():
                     if line:
                         _serial_status["last_line"] = line
                     parts = line.split(",")
-                    if len(parts) == 3 and all(p.isdigit() for p in parts):
+                    if len(parts) >= 3 and all(p.isdigit() for p in parts[:3]):
                         k1 = int(parts[0])
                         k2 = int(parts[1])
                         s  = int(parts[2])
+                        btn_back = 0
+                        btn_next = 0
+                        btn_reset = 0
+                        if len(parts) >= 6 and all(p.isdigit() for p in parts[3:6]):
+                            btn_back = 1 if int(parts[3]) > 0 else 0
+                            btn_next = 1 if int(parts[4]) > 0 else 0
+                            btn_reset = 1 if int(parts[5]) > 0 else 0
                         if not (0 <= k1 <= 1023 and 0 <= k2 <= 1023 and 0 <= s <= 1023):
                             continue  # discard corrupted readings
                         with _serial_lock:
@@ -112,6 +123,9 @@ def _serial_reader():
                             _knob_value    = round(_knob_smooth)
                             _knob2_value   = round(_knob2_smooth)
                             _slider_value  = round(_slider_smooth)
+                            _btn_back      = btn_back
+                            _btn_next      = btn_next
+                            _btn_reset     = btn_reset
         except Exception as e:
             _serial_status = {"connected": False, "port": port, "error": str(e)}
             print(f"[SERIAL] Error on {port}: {e} — retrying in 3s")
@@ -601,6 +615,9 @@ def knob():
             "knob_raw":   _knob_raw,
             "knob2_raw":  _knob2_raw,
             "slider_raw": _slider_raw,
+            "btn_back":   _btn_back,
+            "btn_next":   _btn_next,
+            "btn_reset":  _btn_reset,
         }
 
 

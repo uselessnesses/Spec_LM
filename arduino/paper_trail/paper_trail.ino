@@ -1,12 +1,12 @@
 /*
  * paper_trail.ino
- * VERSION: 007 (2026-04-02)
+ * VERSION: 008 (2026-04-08)
  * ---------------------------------------------------------
  * Paper Trail — Arduino Mega sketch
  *
  * Dual role:
- *   1. Sensor reader: continuously sends A0,A1,A4 over USB serial
- *      so the Flask app can drive the three on-screen controls.
+ *   1. Sensor reader: continuously sends A0,A1,A4 and 3 button states
+ *      over USB serial so the Flask app can drive controls + navigation.
  *   2. Thermal printer: receives print commands from Flask and
  *      sends them to a 58mm Adafruit-style thermal printer via
  *      SoftwareSerial on pins 5 (RX) and 6 (TX).
@@ -16,6 +16,9 @@
  * Knob 1 wiper  → A0      (left control on each screen)
  * Knob 2 wiper  → A1      (right control on each screen)
  * Slider wiper  → A4      (bottom control on each screen)
+ * Back button   → D7      (to GND when pressed; INPUT_PULLUP)
+ * Next button   → D8      (to GND when pressed; INPUT_PULLUP)
+ * Reset button  → D9      (to GND when pressed; INPUT_PULLUP)
  * Printer TX    → Pin 5   (Arduino RX ← printer TX)
  * Printer RX    → Pin 6   (Arduino TX → printer RX)
  * Printer GND   ──┬── External PSU GND
@@ -56,6 +59,11 @@ Adafruit_Thermal printer(&printerSerial);
 bool   printing  = false;
 String inputBuf  = "";
 
+// Navigation buttons (active-low with INPUT_PULLUP)
+const uint8_t BTN_BACK_PIN  = 7;
+const uint8_t BTN_NEXT_PIN  = 8;
+const uint8_t BTN_RESET_PIN = 9;
+
 // Sensor timing
 unsigned long lastSensorSend = 0;
 const unsigned long SENSOR_INTERVAL_MS = 50;
@@ -77,6 +85,9 @@ uint8_t scoreScaledStripBuf[DIAL_ROW_BYTES_DST * DIAL_STRIP_ROWS];
 void setup() {
   Serial.begin(9600);
   printerSerial.begin(19200);
+  pinMode(BTN_BACK_PIN, INPUT_PULLUP);
+  pinMode(BTN_NEXT_PIN, INPUT_PULLUP);
+  pinMode(BTN_RESET_PIN, INPUT_PULLUP);
   printer.begin();
   printer.sleep();   // start in sleep mode; wake on PRINT_START
 }
@@ -177,11 +188,22 @@ void loop() {
     unsigned long now = millis();
     if (now - lastSensorSend >= SENSOR_INTERVAL_MS) {
       lastSensorSend = now;
+
+      uint8_t btnBackPressed  = (digitalRead(BTN_BACK_PIN)  == LOW) ? 1 : 0;
+      uint8_t btnNextPressed  = (digitalRead(BTN_NEXT_PIN)  == LOW) ? 1 : 0;
+      uint8_t btnResetPressed = (digitalRead(BTN_RESET_PIN) == LOW) ? 1 : 0;
+
       Serial.print(analogRead(A0));
       Serial.print(",");
       Serial.print(analogRead(A1));
       Serial.print(",");
-      Serial.println(analogRead(A4));
+      Serial.print(analogRead(A4));
+      Serial.print(",");
+      Serial.print(btnBackPressed);
+      Serial.print(",");
+      Serial.print(btnNextPressed);
+      Serial.print(",");
+      Serial.println(btnResetPressed);
     }
   }
 }

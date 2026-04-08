@@ -1278,6 +1278,7 @@ const state = {
   envReasons:   [],
   socialReasons: [],
   pracReasons:  [],
+  isGenerating: false,
   receiptId:    null,
   // Active hardware controls for current screen
   activeKnob1:  null,
@@ -1530,6 +1531,25 @@ function showScreen(n) {
   }
 }
 
+function goBackOneScreen() {
+  if (state.isGenerating) return;
+  if (state.screen > 0) showScreen(state.screen - 1);
+}
+
+function goNextOrGenerate() {
+  if (state.isGenerating) return;
+  if (state.screen === 2) {
+    generateFinal();
+  } else if (state.screen < 2) {
+    showScreen(state.screen + 1);
+  }
+}
+
+function reloadFromHardwareReset() {
+  if (state.isGenerating) return;
+  window.location.reload();
+}
+
 /* ============================================================
    PROGRESS BAR INIT
    ============================================================ */
@@ -1548,6 +1568,9 @@ function buildProgressBar() {
    GENERATE FINAL
    ============================================================ */
 async function generateFinal() {
+  if (state.isGenerating) return;
+  state.isGenerating = true;
+
   const overlay  = document.getElementById('gen-overlay');
   const storyEl  = document.getElementById('gen-story');
   storyEl.textContent = '';
@@ -1644,6 +1667,8 @@ async function generateFinal() {
     });
     showScreen(3);
     await autoSaveAndPrintReceipt();
+  } finally {
+    state.isGenerating = false;
   }
 }
 
@@ -1854,6 +1879,7 @@ function startOver() {
     modelLocationIdx: 0, modelSizeIdx: 2, systemPromptIdx: 0,
     envScore: 5, socialScore: 5, pracScore: 5,
     envReasons: [], socialReasons: [], pracReasons: [],
+    isGenerating: false,
     receiptId: null,
     activeKnob1: null, activeKnob2: null, activeSlider: null,
   });
@@ -1875,6 +1901,8 @@ function startOver() {
 
   _lastK1Idx = -1; _lastK2Idx = -1; _lastSlIdx = -1;
   _lastK1Raw = -1; _lastK2Raw = -1; _lastSlRaw = -1;
+  _lastBtnBack = 0; _lastBtnNext = 0; _lastBtnReset = 0;
+  _lastNavButtonFireMs = 0;
 
   showScreen(0);
 }
@@ -1885,13 +1913,40 @@ function startOver() {
 let _knobTimer = null;
 let _lastK1Idx = -1, _lastK2Idx = -1, _lastSlIdx = -1;
 let _lastK1Raw = -1, _lastK2Raw = -1, _lastSlRaw = -1;
+let _lastBtnBack = 0, _lastBtnNext = 0, _lastBtnReset = 0;
+let _lastNavButtonFireMs = 0;
 const DEADBAND = 12;
+const NAV_BUTTON_COOLDOWN_MS = 280;
 
 function mapToIndexInverted(raw, positions) {
   return Math.round(((1023 - raw) / 1023) * (positions - 1));
 }
 function mapToIndex(raw, positions) {
   return Math.round((raw / 1023) * (positions - 1));
+}
+
+function handleHardwareNavButtons(btnBack, btnNext, btnReset) {
+  const backPressed = btnBack ? 1 : 0;
+  const nextPressed = btnNext ? 1 : 0;
+  const resetPressed = btnReset ? 1 : 0;
+
+  const now = Date.now();
+  const canFire = (now - _lastNavButtonFireMs) >= NAV_BUTTON_COOLDOWN_MS;
+
+  if (resetPressed && !_lastBtnReset && canFire) {
+    _lastNavButtonFireMs = now;
+    reloadFromHardwareReset();
+  } else if (backPressed && !_lastBtnBack && canFire) {
+    _lastNavButtonFireMs = now;
+    goBackOneScreen();
+  } else if (nextPressed && !_lastBtnNext && canFire) {
+    _lastNavButtonFireMs = now;
+    goNextOrGenerate();
+  }
+
+  _lastBtnBack = backPressed;
+  _lastBtnNext = nextPressed;
+  _lastBtnReset = resetPressed;
 }
 
 /* ============================================================
@@ -1988,7 +2043,10 @@ function startKnobPoll() {
   _knobTimer = setInterval(async () => {
     try {
       const r = await fetch('/api/knob');
-      const { knob, knob2, slider, knob_raw, knob2_raw, slider_raw } = await r.json();
+      const {
+        knob, knob2, slider, knob_raw, knob2_raw, slider_raw,
+        btn_back = 0, btn_next = 0, btn_reset = 0
+      } = await r.json();
 
       // Debug display (always updated, even on receipt screen)
       const k1Pos = state.activeKnob1 ? state.activeKnob1.n : '?';
@@ -2003,6 +2061,9 @@ function startKnobPoll() {
       document.getElementById('dbg-sl-raw').textContent  = slider_raw;
       document.getElementById('dbg-sl-sm').textContent   = slider;
       document.getElementById('dbg-sl-idx').textContent  = state.activeSlider ? mapToIndex(slider, slPos) : '—';
+
+      // Hardware navigation buttons (edge-triggered).
+      handleHardwareNavButtons(btn_back, btn_next, btn_reset);
 
       // UI control updates — skip on receipt screen
       if (state.screen === 3) return;
@@ -2055,13 +2116,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.target === document.getElementById('port-modal')) closePortPicker();
   });
 
-  document.getElementById('back-btn').addEventListener('click', () => {
-    if (state.screen > 0) showScreen(state.screen - 1);
-  });
-  document.getElementById('next-btn').addEventListener('click', () => {
-    if (state.screen === 2) generateFinal();
-    else showScreen(state.screen + 1);
-  });
+  document.getElementById('back-btn').addEventListener('click', goBackOneScreen);
+  document.getElementById('next-btn').addEventListener('click', goNextOrGenerate);
   document.getElementById('start-over-btn').addEventListener('click', startOver);
   document.getElementById('print-btn').addEventListener('click', printReceipt);
 
