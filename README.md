@@ -113,9 +113,9 @@ Add three normally-open push buttons for hardware navigation.
 
 | Button function         | Arduino pin |
 |-------------------------|-------------|
-| Back (previous page)    | D7          |
-| Next / Generate         | D8          |
-| Reset (browser refresh) | D9          |
+| Back (previous page)    | D8          |
+| Next / Generate         | D9          |
+| Reset (browser refresh) | D7          |
 
 For 4-leg tactile/panel buttons: use one leg from each internally-connected pair (effectively across the switch), not two legs on the same side.
 
@@ -207,9 +207,9 @@ Press **GENERATE** on screen 3 to produce the receipt.
 
 Hardware button behavior matches the on-screen flow:
 
-- **Back (D7):** previous screen
-- **Next (D8):** next screen, or **Generate** on screen 3
-- **Reset (D9):** refreshes the browser page
+- **Back (D8):** previous screen
+- **Next (D9):** next screen, or **Generate** on screen 3
+- **Reset (D7):** refreshes the browser page
 
 ---
 

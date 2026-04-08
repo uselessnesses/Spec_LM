@@ -1,6 +1,6 @@
 /*
  * paper_trail.ino
- * VERSION: 008 (2026-04-08)
+ * VERSION: 009 (2026-04-08)
  * ---------------------------------------------------------
  * Paper Trail — Arduino Mega sketch
  *
@@ -16,9 +16,9 @@
  * Knob 1 wiper  → A0      (left control on each screen)
  * Knob 2 wiper  → A1      (right control on each screen)
  * Slider wiper  → A4      (bottom control on each screen)
- * Back button   → D7      (to GND when pressed; INPUT_PULLUP)
- * Next button   → D8      (to GND when pressed; INPUT_PULLUP)
- * Reset button  → D9      (to GND when pressed; INPUT_PULLUP)
+ * Back button   → D8      (to GND when pressed; INPUT_PULLUP)
+ * Next button   → D9      (to GND when pressed; INPUT_PULLUP)
+ * Reset button  → D7      (to GND when pressed; INPUT_PULLUP)
  * Printer TX    → Pin 5   (Arduino RX ← printer TX)
  * Printer RX    → Pin 6   (Arduino TX → printer RX)
  * Printer GND   ──┬── External PSU GND
@@ -60,9 +60,9 @@ bool   printing  = false;
 String inputBuf  = "";
 
 // Navigation buttons (active-low with INPUT_PULLUP)
-const uint8_t BTN_BACK_PIN  = 7;
-const uint8_t BTN_NEXT_PIN  = 8;
-const uint8_t BTN_RESET_PIN = 9;
+const uint8_t BTN_BACK_PIN  = 8;
+const uint8_t BTN_NEXT_PIN  = 9;
+const uint8_t BTN_RESET_PIN = 7;
 
 // Sensor timing
 unsigned long lastSensorSend = 0;
