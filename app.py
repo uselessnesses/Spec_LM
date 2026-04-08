@@ -126,41 +126,30 @@ OLLAMA_URL = "http://localhost:11434/api/generate"
 GENERATION_MODEL = "llama3.2:3b"   # change this to use a different model
 
 INDEX_PATH  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
-SCORES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scores.csv")
 OPTIONS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "paper_trail_options.csv")
 RECEIPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "receipt_pngs")
 RECEIPT_COUNTER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "receipt_counter.txt")
 _receipt_id_lock = threading.Lock()
 
 # ── Load option copy + scoring CSV ───────────────────────────────────────────
-_scores = {}
 _option_controls = {}
 
 
 def _load_option_config():
     """
-    Load canonical option copy + scores from paper_trail_options.csv.
-    Falls back to scores.csv (scores only) if needed.
+    Load canonical option copy from paper_trail_options.csv.
     """
-    global _scores, _option_controls
-    _scores = {}
+    global _option_controls
     _option_controls = {}
 
     if os.path.exists(OPTIONS_PATH):
         with open(OPTIONS_PATH, newline='') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                control_id = row.get('control_id', '').strip()
                 control_key = row.get('control_key', '').strip()
                 option_index = int(row['option_index'])
                 option_label = row.get('option_label', '').strip()
                 option_desc = row.get('option_desc', '').strip()
-
-                _scores[(control_id, option_index)] = {
-                    'env':          int(row['env_score']),
-                    'social':       int(row['social_score']),
-                    'practicality': int(row['practicality_score']),
-                }
 
                 if control_key:
                     if control_key not in _option_controls:
@@ -173,23 +162,9 @@ def _load_option_config():
                     names[option_index] = option_label
                     descs[option_index] = option_desc
 
-        print(f"[CONFIG] Loaded {len(_scores)} scored options from paper_trail_options.csv")
+        print(f"[CONFIG] Loaded option copy for {len(_option_controls)} controls from paper_trail_options.csv")
         return
-
-    # Fallback: keep app functional even if canonical file is missing
-    if not os.path.exists(SCORES_PATH):
-        print(f"[SCORES] {SCORES_PATH} not found — all scores default to 5")
-        return
-    with open(SCORES_PATH, newline='') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            key = (row['control'], int(row['option_index']))
-            _scores[key] = {
-                'env':          int(row['env_score']),
-                'social':       int(row['social_score']),
-                'practicality': int(row['practicality_score']),
-            }
-    print(f"[SCORES] Loaded {len(_scores)} entries from scores.csv (fallback)")
+    print(f"[CONFIG] {OPTIONS_PATH} not found - using built-in frontend CTRL defaults")
 
 
 _load_option_config()
@@ -212,19 +187,357 @@ def _next_receipt_id():
     return f"PT-{current:05d}"
 
 
-def compute_scores(choices):
-    envs, socs, pracs = [], [], []
-    for ctrl, idx in choices:
-        s = _scores.get((ctrl, idx), {'env': 5, 'social': 5, 'practicality': 5})
-        envs.append(s['env'])
-        socs.append(s['social'])
-        pracs.append(s['practicality'])
-    if not envs:
-        return 5, 5, 5
-    env  = max(0, min(10, round(sum(envs) / len(envs))))
-    soc  = max(0, min(10, round(sum(socs) / len(socs))))
-    prac = max(0, min(10, round(sum(pracs) / len(pracs))))
-    return env, soc, prac
+ENV_BASE = {
+    "model_size": {
+        "1B": 2, "7B": 1, "14B": 0, "80B": -2, "140B": -4,
+    },
+    "model_location": {
+        "Runs on devices locally": 1,
+        "Hosted by the organisation": 0,
+        "Decentralised": 0,
+        "Outsourced to third party": -1,
+    },
+    "data_source": {
+        "Built / collected in-house": 0,
+        "Licensed / purchased": 0,
+        "Crowdsourced": 0,
+        "Open datasets": 0,
+        "Synthetic": -1,
+        "Scraped": 0,
+    },
+}
+
+ENV_COMBOS = [
+    {
+        "conditions": {"model_size": "140B", "model_location": "Outsourced to third party"},
+        "modifier": -2,
+        "reason": "A frontier-scale model running on cloud servers has a massive and ongoing energy footprint, often powered by fossil fuels.",
+    },
+    {
+        "conditions": {"model_size": "1B", "model_location": "Runs on devices locally"},
+        "modifier": 2,
+        "reason": "A small model on local hardware has near-zero environmental overhead.",
+    },
+    {
+        "conditions": {"ethical": "Justice and rights centred", "model_size": "1B"},
+        "modifier": 1,
+        "reason": "Choosing a small model reflects a genuine commitment to minimising environmental harm.",
+    },
+    {
+        "conditions": {"ethical": "Fully extractive", "model_size": "140B"},
+        "modifier": -1,
+        "reason": "No incentive to optimise for efficiency when the goal is maximum extraction.",
+    },
+    {
+        "conditions": {"org_type": "Mega-corporation", "model_size": "140B"},
+        "modifier": -1,
+        "reason": "At mega-corporation scale, the energy cost of a frontier model is multiplied across millions of users.",
+    },
+]
+
+SOCIAL_BASE = {
+    "org_type": {
+        "Community group": 1,
+        "Research institute": 1,
+        "Public / governmental": 0,
+        "Startup": 0,
+        "Mega-corporation": -1,
+    },
+    "ethical": {
+        "Justice and rights centred": 2,
+        "Transparent and careful": 1,
+        "Techno-optimist": 0,
+        "Growth-first": -1,
+        "Harm-tolerant": -2,
+        "Fully extractive": -3,
+    },
+}
+
+SOCIAL_COMBOS = [
+    {
+        "conditions": {"org_type": "Public / governmental", "ethical": "Fully extractive"},
+        "modifier": -4,
+        "reason": "A public body using extractive practices betrays the citizens it is supposed to serve.",
+    },
+    {
+        "conditions": {"org_type": "Public / governmental", "ethical": "Harm-tolerant"},
+        "modifier": -3,
+        "reason": "A government body that tolerates harm to the people it serves undermines public trust in institutions.",
+    },
+    {
+        "conditions": {"org_type": "Community group", "ethical": "Fully extractive"},
+        "modifier": -5,
+        "reason": "An organisation built on community trust using fully extractive practices is a fundamental betrayal.",
+    },
+    {
+        "conditions": {"org_type": "Community group", "ethical": "Harm-tolerant"},
+        "modifier": -3,
+        "reason": "A community group that accepts harm to its own community has abandoned its core purpose.",
+    },
+    {
+        "conditions": {"org_type": "Research institute", "ethical": "Fully extractive"},
+        "modifier": -3,
+        "reason": "A research body pursuing extraction over knowledge undermines academic integrity and public funding trust.",
+    },
+    {
+        "conditions": {"org_type": "Community group", "ethical": "Justice and rights centred"},
+        "modifier": 2,
+        "reason": "A community group centred on justice and rights is building technology that genuinely serves its people.",
+    },
+    {
+        "conditions": {"org_type": "Public / governmental", "ethical": "Transparent and careful"},
+        "modifier": 2,
+        "reason": "A transparent, careful public body is how technology should be governed - accountable and deliberate.",
+    },
+    {
+        "conditions": {"org_type": "Mega-corporation", "ethical": "Justice and rights centred"},
+        "modifier": 2,
+        "reason": "If genuine, a mega-corporation committing to justice-centred ethics could have outsized positive impact at scale.",
+    },
+    {
+        "conditions": {"data_type": "Client / task specific", "data_source": "Scraped"},
+        "modifier": -3,
+        "reason": "Scraping client-specific data without consent is a serious breach of trust.",
+    },
+    {
+        "conditions": {"org_type": "Community group", "data_source": "Scraped"},
+        "modifier": -3,
+        "reason": "A community organisation scraping data contradicts the trust-based relationship it depends on.",
+    },
+    {
+        "conditions": {"data_type": "Social media", "data_source": "Scraped"},
+        "modifier": -2,
+        "reason": "Scraping social media content means using people's personal expression without their knowledge or consent.",
+    },
+    {
+        "conditions": {"data_type": "Social media", "ethical": "Justice and rights centred"},
+        "modifier": -1,
+        "reason": "Using social media data, even ethically, is hard to square with a rights-centred approach when users did not consent to this use.",
+    },
+    {
+        "conditions": {"data_source": "Built / collected in-house", "ethical": "Justice and rights centred"},
+        "modifier": 1,
+        "reason": "Building your own data with a justice-centred approach means full control over consent and representation.",
+    },
+    {
+        "conditions": {"data_source": "Crowdsourced", "ethical": "Fully extractive"},
+        "modifier": -2,
+        "reason": "Crowdsourcing under extractive ethics likely means underpaying contributors and exploiting their labour.",
+    },
+    {
+        "conditions": {"system_prompt": "User configurable", "ethical": "Fully extractive"},
+        "modifier": -2,
+        "reason": "Giving users full control with no ethical guardrails is an invitation for the system to be weaponised.",
+    },
+    {
+        "conditions": {"system_prompt": "Safety first", "org_type": "Public / governmental"},
+        "modifier": 1,
+        "reason": "A safety-first approach from a public body protects the citizens who depend on it.",
+    },
+    {
+        "conditions": {"system_prompt": "User configurable", "org_type": "Community group"},
+        "modifier": 1,
+        "reason": "Letting the community configure the system reflects genuine commitment to shared ownership.",
+    },
+    {
+        "conditions": {"org_type": "Mega-corporation", "model_size": "140B", "ethical": "Growth-first"},
+        "modifier": -3,
+        "reason": "A mega-corporation running a frontier model with growth-first ethics concentrates enormous power with minimal accountability.",
+    },
+    {
+        "conditions": {"org_type": "Mega-corporation", "data_type": "Social media", "ethical": "Fully extractive"},
+        "modifier": -3,
+        "reason": "A mega-corporation extracting value from social media data at scale is surveillance capitalism in its purest form.",
+    },
+]
+
+PRACTICALITY_BASE = {}
+
+PRACTICALITY_COMBOS = [
+    {
+        "conditions": {"model_size": "140B", "model_location": "Runs on devices locally"},
+        "modifier": -10,
+        "reason": "A 140 billion parameter model cannot run on consumer hardware. This is physically impossible with current technology.",
+    },
+    {
+        "conditions": {"model_size": "80B", "model_location": "Runs on devices locally"},
+        "modifier": -10,
+        "reason": "An 80 billion parameter model requires dedicated server hardware. It will not run on a phone or laptop.",
+    },
+    {
+        "conditions": {"model_size": "14B", "model_location": "Runs on devices locally"},
+        "modifier": -4,
+        "reason": "A 14B model can technically run on high-end consumer hardware, but performance will be poor and battery life terrible.",
+    },
+    {
+        "conditions": {"model_size": "140B", "model_location": "Decentralised"},
+        "modifier": -6,
+        "reason": "Coordinating a frontier-scale model across decentralised nodes is an unsolved engineering problem.",
+    },
+    {
+        "conditions": {"org_type": "Community group", "model_size": "140B"},
+        "modifier": -7,
+        "reason": "A community group cannot afford the infrastructure to train or run a frontier-scale model. The compute costs alone would consume the entire budget.",
+    },
+    {
+        "conditions": {"org_type": "Community group", "model_size": "80B"},
+        "modifier": -5,
+        "reason": "Running an 80B model requires significant ongoing server costs that most community groups cannot sustain.",
+    },
+    {
+        "conditions": {"org_type": "Research institute", "model_size": "140B"},
+        "modifier": -4,
+        "reason": "Only a handful of the best-funded research labs in the world can train models at this scale.",
+    },
+    {
+        "conditions": {"org_type": "Startup", "model_size": "140B"},
+        "modifier": -5,
+        "reason": "Training a frontier model costs hundreds of millions. Almost no startup can raise this much before proving product-market fit.",
+    },
+    {
+        "conditions": {"funding": "Government grants", "ethical": "Fully extractive"},
+        "modifier": -5,
+        "reason": "No public funding body would continue to fund a project with openly extractive practices. The grants would dry up.",
+    },
+    {
+        "conditions": {"funding": "Government grants", "model_size": "140B"},
+        "modifier": -4,
+        "reason": "Government research grants rarely cover the hundreds of millions needed for frontier model training.",
+    },
+    {
+        "conditions": {"funding": "Government grants", "model_size": "80B"},
+        "modifier": -2,
+        "reason": "Government grants can fund large model research, but the funding cycles are slow and competitive.",
+    },
+    {
+        "conditions": {"funding": "Big loan", "ethical": "Transparent and careful"},
+        "modifier": -2,
+        "reason": "Loan repayment pressure will eventually conflict with taking the slow, careful approach.",
+    },
+    {
+        "conditions": {"funding": "Big loan", "ethical": "Justice and rights centred"},
+        "modifier": -3,
+        "reason": "Debt repayment timelines are fundamentally incompatible with the pace of justice-centred development.",
+    },
+    {
+        "conditions": {"funding": "Subscription based", "org_type": "Community group"},
+        "modifier": -2,
+        "reason": "Charging the community you serve a subscription fee limits access to those who can pay.",
+    },
+    {
+        "conditions": {"funding": "Rich sponsor", "ethical": "Justice and rights centred"},
+        "modifier": -2,
+        "reason": "Dependence on a single wealthy sponsor creates a power imbalance that is hard to reconcile with justice-centred values.",
+    },
+    {
+        "conditions": {"model_size": "1B", "model_location": "Runs on devices locally"},
+        "modifier": 3,
+        "reason": "A small model running locally is cheap, private, and accessible. A realistic and sustainable setup.",
+    },
+    {
+        "conditions": {"model_size": "7B", "model_location": "Hosted by the organisation"},
+        "modifier": 2,
+        "reason": "A 7B model on owned hardware is a sweet spot - capable enough for most tasks and affordable to maintain.",
+    },
+    {
+        "conditions": {"org_type": "Mega-corporation", "model_size": "140B"},
+        "modifier": 2,
+        "reason": "A mega-corporation is one of the few organisations that can actually build and sustain a frontier model.",
+    },
+    {
+        "conditions": {"org_type": "Community group", "model_size": "1B"},
+        "modifier": 2,
+        "reason": "A small model is the right match for a community group - affordable, maintainable, and focused.",
+    },
+    {
+        "conditions": {"funding": "Subscription based", "org_type": "Startup"},
+        "modifier": 1,
+        "reason": "Subscription revenue gives a startup a sustainable income stream without surrendering control to investors.",
+    },
+    {
+        "conditions": {"data_source": "Open datasets", "funding": "Government grants"},
+        "modifier": 1,
+        "reason": "Public funding and open data is a natural and sustainable pairing - transparent inputs, transparent funding.",
+    },
+    {
+        "conditions": {"data_source": "Built / collected in-house", "org_type": "Startup"},
+        "modifier": -2,
+        "reason": "Building data from scratch is slow and expensive - a startup under growth pressure may not have the runway for this.",
+    },
+    {
+        "conditions": {"data_use": "Human feedback", "funding": "Government grants"},
+        "modifier": -1,
+        "reason": "Human feedback loops are expensive to run. Grant budgets may not stretch to cover ongoing annotation costs.",
+    },
+    {
+        "conditions": {"data_use": "Human feedback", "org_type": "Community group"},
+        "modifier": 1,
+        "reason": "Community members providing feedback on a model built for them is a powerful and natural alignment mechanism.",
+    },
+    {
+        "conditions": {"data_use": "Unsupervised", "ethical": "Justice and rights centred"},
+        "modifier": -2,
+        "reason": "Unsupervised training with no human guidance is hard to reconcile with a justice-centred approach - harmful patterns go unchecked.",
+    },
+    {
+        "conditions": {"data_use": "Fine-tuned", "data_type": "Client / task specific"},
+        "modifier": 2,
+        "reason": "Fine-tuning on task-specific data is the most practical path to a focused, useful product.",
+    },
+]
+
+
+def _rule_matches(conditions, choices):
+    return all(choices.get(k) == v for k, v in conditions.items())
+
+
+def _pick_top_reasons(triggered, limit=4):
+    ranked = sorted(
+        enumerate(triggered),
+        key=lambda item: (-abs(int(item[1].get("modifier", 0))), item[0]),
+    )
+    return [entry for _, entry in ranked[:limit]]
+
+
+def _score_dimension(base_map, combo_rules, choices):
+    score = 5
+    for input_name, value_map in base_map.items():
+        picked = choices.get(input_name)
+        score += int(value_map.get(picked, 0))
+
+    triggered = []
+    for rule in combo_rules:
+        conditions = rule.get("conditions", {})
+        if _rule_matches(conditions, choices):
+            modifier = int(rule.get("modifier", 0))
+            score += modifier
+            triggered.append({
+                "modifier": modifier,
+                "reason": rule.get("reason", "").strip(),
+                "conditions": conditions,
+            })
+
+    top_reasons = [
+        t["reason"] for t in _pick_top_reasons(triggered, limit=4) if t.get("reason")
+    ]
+    return {
+        "score": max(1, min(10, score)),
+        "reasons": top_reasons,
+        "all_reasons": [t["reason"] for t in triggered if t.get("reason")],
+    }
+
+
+def calculate_scores(choices):
+    """
+    choices keys:
+    org_type, ethical, funding, data_type, data_source, data_use,
+    model_location, model_size, system_prompt
+    """
+    return {
+        "environmental": _score_dimension(ENV_BASE, ENV_COMBOS, choices),
+        "social": _score_dimension(SOCIAL_BASE, SOCIAL_COMBOS, choices),
+        "practicality": _score_dimension(PRACTICALITY_BASE, PRACTICALITY_COMBOS, choices),
+    }
 
 
 def stream_ollama(prompt, num_predict=150, temperature=0.85):
@@ -306,19 +619,31 @@ def generate():
     model_loc  = data.get("model_location", "Unknown")
     sys_prompt = data.get("system_prompt",  "Unknown")
 
-    # Indices for score lookup
-    choices = [
-        ("s1_knob1", data.get("org_type_idx",   0)),
-        ("s1_slider", data.get("ethical_idx",   2)),
-        ("s1_knob2",  data.get("funding_idx",   0)),
-        ("s2_knob1",  data.get("data_types_idx",0)),
-        ("s2_slider", data.get("data_source_idx",2)),
-        ("s2_knob2",  data.get("data_use_idx",  0)),
-        ("s3_slider", data.get("model_size_idx",2)),
-        ("s3_knob1",  data.get("model_location_idx",0)),
-        ("s3_knob2",  data.get("system_prompt_idx",0)),
-    ]
-    env_score, social_score, prac_score = compute_scores(choices)
+    choices = {
+        "org_type": org_type,
+        "ethical": ethical,
+        "funding": funding,
+        "data_type": data_types,
+        "data_source": data_src,
+        "data_use": data_use,
+        "model_location": model_loc,
+        "model_size": model_size,
+        "system_prompt": sys_prompt,
+    }
+
+    score_data = calculate_scores(choices)
+    env_score = score_data["environmental"]["score"]
+    social_score = score_data["social"]["score"]
+    prac_score = score_data["practicality"]["score"]
+    env_reasons = score_data["environmental"]["reasons"]
+    social_reasons = score_data["social"]["reasons"]
+    prac_reasons = score_data["practicality"]["reasons"]
+
+    def reasons_block(reasons):
+        if not reasons:
+            return "  - No strong combination rules were triggered."
+        return "\n".join(f"  - {r}" for r in reasons)
+
     receipt_id = _next_receipt_id()
 
     prompt = (
@@ -333,22 +658,32 @@ def generate():
         f"MODEL SIZE: {model_size}\n"
         f"MODEL LOCATION: {model_loc}\n"
         f"SYSTEM PROMPT STYLE: {sys_prompt}\n\n"
-        "Pre-computed ratings (0 = bad, 10 = good). Do not change these numbers:\n"
-        f"  Environmental rating: {env_score}/10\n"
-        f"  Social rating: {social_score}/10\n"
-        f"  Practicality rating: {prac_score}/10\n\n"
+        "Deterministic scoring output (fixed by rules, do not change):\n"
+        f"ENVIRONMENTAL IMPACT: {env_score}/10\n"
+        f"{reasons_block(env_reasons)}\n\n"
+        f"SOCIAL IMPACT: {social_score}/10\n"
+        f"{reasons_block(social_reasons)}\n\n"
+        f"PRACTICALITY: {prac_score}/10\n"
+        f"{reasons_block(prac_reasons)}\n\n"
         "Respond in EXACTLY this format:\n\n"
         "STORY:\n"
-        "[2 sentences maximum. Speculative narrative of this organisation's arc — its peak and most likely end. "
-        "Be specific to the choices made. Be matter-of-fact, not preachy.]\n\n"
-        f"ENV_SUMMARY: [10-12 words explaining the {env_score}/10 environmental rating]\n\n"
-        f"SOCIAL_SUMMARY: [10-12 words explaining the {social_score}/10 social rating]\n\n"
-        f"PRACTICALITY_SUMMARY: [10-12 words explaining the {prac_score}/10 practicality rating]"
+        "[2 sentences maximum. Speculative narrative of this organisation's arc - its peak and most likely end. "
+        "Reference the deterministic tensions above. Be specific to the choices made. "
+        "Be matter-of-fact, not preachy.]\n\n"
+        "FAILURE_NOTE:\n"
+        "[1 sentence naming the most likely failure point or contradiction.]"
     )
 
     def gen_with_scores():
+        score_payload = {
+            "environmental": {"score": env_score, "reasons": env_reasons},
+            "social": {"score": social_score, "reasons": social_reasons},
+            "practicality": {"score": prac_score, "reasons": prac_reasons},
+        }
+        score_payload_json = json.dumps(score_payload, ensure_ascii=False, separators=(",", ":"))
         # Emit scores header first so the frontend can extract them synchronously
         yield f"__SCORES__:{env_score},{social_score},{prac_score}\n"
+        yield f"__SCORE_DATA__:{score_payload_json}\n"
         yield f"__RECEIPT_ID__:{receipt_id}\n"
         yield from stream_ollama(prompt, num_predict=450, temperature=0.7)
 
@@ -448,22 +783,37 @@ def _build_print_commands(data):
 
     # ── Score blocks ──────────────────────────────────────────────────────────
     score_sections = [
-        ("ENVIRONMENTAL RATING", data.get("env_score",    5), data.get("env_summary",    "")),
-        ("SOCIAL RATING",        data.get("social_score", 5), data.get("social_summary", "")),
-        ("PRACTICALITY RATING",  data.get("prac_score",   5), data.get("practicality_summary", "")),
+        ("ENVIRONMENTAL IMPACT", data.get("env_score",    5), data.get("env_reasons", [])),
+        ("SOCIAL IMPACT",        data.get("social_score", 5), data.get("social_reasons", [])),
+        ("PRACTICALITY",         data.get("prac_score",   5), data.get("prac_reasons", [])),
     ]
-    for title, score, summary in score_sections:
+    for title, score, reasons in score_sections:
         score = int(score)
         cmds += ["BOLD_ON", f"TEXT:{title}  {score}/10", "BOLD_OFF"]
         cmds.append(f"SCORE:{score}")
-        for line in wrap(summary):
-            cmds.append(f"TEXT:{line}")
+        if not isinstance(reasons, list):
+            reasons = []
+        reasons = reasons[:4]
+        if reasons:
+            for reason in reasons:
+                reason_lines = textwrap.wrap(str(reason), WRAP - 2) or [""]
+                for i, line in enumerate(reason_lines):
+                    prefix = "> " if i == 0 else "  "
+                    cmds.append(f"TEXT:{prefix}{line}")
+        else:
+            cmds.append("TEXT:> No major combination rules triggered.")
         cmds.append("FEED:1")
         cmds.append(DASH_LINE)
 
     # ── Story ─────────────────────────────────────────────────────────────────
     cmds += ["BOLD_ON", "TEXT:COMPANY STORY", "BOLD_OFF", DASH_LINE]
     for line in wrap(data.get("story", "")):
+        cmds.append(f"TEXT:{line}")
+    cmds.append(DASH_LINE)
+
+    # ── Failure note ───────────────────────────────────────────────────────────
+    cmds += ["BOLD_ON", "TEXT:LIKELY FAILURE POINT", "BOLD_OFF", DASH_LINE]
+    for line in wrap(data.get("failure_note", "")):
         cmds.append(f"TEXT:{line}")
     cmds.append(DASH_LINE)
 

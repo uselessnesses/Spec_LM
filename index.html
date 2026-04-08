@@ -375,7 +375,16 @@ html, body {
 .r-score-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
 .r-score-title  { font-size: 13px; letter-spacing: 1px; color: #444; font-weight: bold; }
 .r-score-num    { font-size: 16px; font-weight: bold; white-space: nowrap; }
-.r-score-summary{ font-size: 12px; color: #333; line-height: 1.6; font-style: italic; }
+.r-score-reasons{
+  font-size: 10px;
+  color: #2f2f2f;
+  line-height: 1.5;
+  font-family: 'Courier New', monospace;
+}
+.r-score-reason {
+  margin: 2px 0;
+  white-space: normal;
+}
 .r-write-line {
   border-bottom: 1px dashed #b0a898;
   height: 22px;
@@ -1266,6 +1275,9 @@ const state = {
   envScore:     5,
   socialScore:  5,
   pracScore:    5,
+  envReasons:   [],
+  socialReasons: [],
+  pracReasons:  [],
   receiptId:    null,
   // Active hardware controls for current screen
   activeKnob1:  null,
@@ -1540,6 +1552,9 @@ async function generateFinal() {
   const storyEl  = document.getElementById('gen-story');
   storyEl.textContent = '';
   state.receiptId = null;
+  state.envReasons = [];
+  state.socialReasons = [];
+  state.pracReasons = [];
   overlay.classList.add('active');
 
   const payload = {
@@ -1566,6 +1581,7 @@ async function generateFinal() {
   try {
     let fullBuf = '';
     let scoresExtracted = false;
+    let scoreDataExtracted = false;
     let receiptIdExtracted = false;
 
     await streamLLM('/api/generate', payload, (buf) => {
@@ -1580,6 +1596,24 @@ async function generateFinal() {
           scoresExtracted = true;
         }
       }
+      if (!scoreDataExtracted) {
+        const m = buf.match(/^__SCORE_DATA__:(.+)$/m);
+        if (m) {
+          try {
+            const scoreData = JSON.parse(m[1]);
+            const env = scoreData.environmental || {};
+            const soc = scoreData.social || {};
+            const pra = scoreData.practicality || {};
+            state.envScore = Number.isFinite(env.score) ? env.score : state.envScore;
+            state.socialScore = Number.isFinite(soc.score) ? soc.score : state.socialScore;
+            state.pracScore = Number.isFinite(pra.score) ? pra.score : state.pracScore;
+            state.envReasons = Array.isArray(env.reasons) ? env.reasons : [];
+            state.socialReasons = Array.isArray(soc.reasons) ? soc.reasons : [];
+            state.pracReasons = Array.isArray(pra.reasons) ? pra.reasons : [];
+            scoreDataExtracted = true;
+          } catch (_) {}
+        }
+      }
       if (!receiptIdExtracted) {
         const m = buf.match(/^__RECEIPT_ID__:(.+)$/m);
         if (m) {
@@ -1588,8 +1622,8 @@ async function generateFinal() {
         }
       }
       // Show story in overlay as it streams
-      const rest = buf.replace(/^__(?:SCORES|RECEIPT_ID)__:[^\n]*\n/gm, '');
-      const m = rest.match(/STORY:\s*([\s\S]*?)(?=\n+(?:ENV|SOCIAL|PRACTICALITY)[^\n]*SUMMARY:|$)/i);
+      const rest = buf.replace(/^__(?:SCORES|SCORE_DATA|RECEIPT_ID)__:[^\n]*\n/gm, '');
+      const m = rest.match(/STORY:\s*([\s\S]*?)(?=\n+FAILURE_NOTE:|$)/i);
       if (m) storyEl.textContent = m[1].trim();
     });
 
@@ -1602,9 +1636,10 @@ async function generateFinal() {
     overlay.classList.remove('active');
     renderReceipt({
       story: 'Could not reach Ollama. Is it running?',
-      envSummary: '',
-      socialSummary: '',
-      practicalitySummary: '',
+      failureNote: '',
+      envReasons: state.envReasons || [],
+      socialReasons: state.socialReasons || [],
+      pracReasons: state.pracReasons || [],
       receiptId: state.receiptId,
     });
     showScreen(3);
@@ -1617,20 +1652,34 @@ async function generateFinal() {
    ============================================================ */
 function parseFinal(text) {
   const rid = ((text.match(/^__RECEIPT_ID__:(.+)$/m) || [])[1] || state.receiptId || '').trim();
-  const clean = text.replace(/^__(?:SCORES|RECEIPT_ID)__:[^\n]*\n/gm, '');
-  // Stop story before any summary keyword regardless of exact wording
+  const scoreMatch = text.match(/^__SCORE_DATA__:(.+)$/m);
+  if (scoreMatch) {
+    try {
+      const scoreData = JSON.parse(scoreMatch[1]);
+      const env = scoreData.environmental || {};
+      const soc = scoreData.social || {};
+      const pra = scoreData.practicality || {};
+      if (Number.isFinite(env.score)) state.envScore = env.score;
+      if (Number.isFinite(soc.score)) state.socialScore = soc.score;
+      if (Number.isFinite(pra.score)) state.pracScore = pra.score;
+      state.envReasons = Array.isArray(env.reasons) ? env.reasons : [];
+      state.socialReasons = Array.isArray(soc.reasons) ? soc.reasons : [];
+      state.pracReasons = Array.isArray(pra.reasons) ? pra.reasons : [];
+    } catch (_) {}
+  }
+
+  const clean = text.replace(/^__(?:SCORES|SCORE_DATA|RECEIPT_ID)__:[^\n]*\n/gm, '');
   const story = (clean.match(
-    /STORY:\s*([\s\S]*?)(?=\n+(?:ENV|SOCIAL|PRACTICALITY)[^\n]*SUMMARY:)/i
+    /STORY:\s*([\s\S]*?)(?=\n+FAILURE_NOTE:|$)/i
   ) || clean.match(/STORY:\s*([\s\S]*)/i) || [])[1] || '';
-  // Match any variant the LLM uses for each summary key
-  const envSum  = (clean.match(/ENV(?:IRONMENTAL)?[_\s](?:IMPACT[_\s])?SUMMARY:\s*([^\n]+)/i) || [])[1] || '';
-  const socSum  = (clean.match(/SOCIAL[_\s](?:IMPACT[_\s])?SUMMARY:\s*([^\n]+)/i) || [])[1] || '';
-  const pracSum = (clean.match(/PRACTICALITY[_\s](?:\w+[_\s])?SUMMARY:\s*([^\n]+)/i) || [])[1] || '';
+  const failureNote = (clean.match(/FAILURE_NOTE:\s*([^\n]+)/i) || [])[1] || '';
+
   return {
     story:               story.trim(),
-    envSummary:          envSum.trim(),
-    socialSummary:       socSum.trim(),
-    practicalitySummary: pracSum.trim(),
+    failureNote:         failureNote.trim(),
+    envReasons:          state.envReasons || [],
+    socialReasons:       state.socialReasons || [],
+    pracReasons:         state.pracReasons || [],
     receiptId:           rid,
   };
 }
@@ -1661,7 +1710,26 @@ function makeImpactDial(score) {
   </svg>`;
 }
 
-function makeScoreBlock(title, score, summary) {
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function makeReasonLines(reasons) {
+  const list = Array.isArray(reasons) ? reasons.slice(0, 4) : [];
+  if (!list.length) {
+    return '<div class="r-score-reason">&gt; No major combination rules triggered.</div>';
+  }
+  return list.map((reason) => (
+    `<div class="r-score-reason">&gt; ${escapeHtml(reason)}</div>`
+  )).join('');
+}
+
+function makeScoreBlock(title, score, reasons) {
   const col = scoreColor(score);
   return `<div class="r-score-block">
     <div class="r-score-dial">${makeImpactDial(score)}</div>
@@ -1670,7 +1738,7 @@ function makeScoreBlock(title, score, summary) {
         <span class="r-score-title">${title}</span>
         <span class="r-score-num" style="color:${col};">${score} / 10</span>
       </div>
-      <div class="r-score-summary">${summary || '—'}</div>
+      <div class="r-score-reasons">${makeReasonLines(reasons)}</div>
     </div>
   </div>`;
 }
@@ -1723,14 +1791,19 @@ function renderReceipt(data) {
 
     <hr class="r-divider">
 
-    ${makeScoreBlock('ENVIRONMENTAL RATING', env,  data.envSummary)}
-    ${makeScoreBlock('SOCIAL RATING',        soc,  data.socialSummary)}
-    ${makeScoreBlock('PRACTICALITY RATING',  prac, data.practicalitySummary)}
+    ${makeScoreBlock('ENVIRONMENTAL IMPACT', env,  data.envReasons)}
+    ${makeScoreBlock('SOCIAL IMPACT',        soc,  data.socialReasons)}
+    ${makeScoreBlock('PRACTICALITY',         prac, data.pracReasons)}
 
     <hr class="r-divider">
 
     <div class="r-label" style="margin-bottom:6px;">COMPANY STORY</div>
     <div class="r-story">${data.story || '—'}</div>
+
+    <hr class="r-divider">
+
+    <div class="r-label" style="margin-bottom:6px;">LIKELY FAILURE POINT</div>
+    <div class="r-story">${data.failureNote || '—'}</div>
 
     <hr class="r-divider">
 
@@ -1780,6 +1853,7 @@ function startOver() {
     dataTypesIdx: 0, dataSourceIdx: 2, dataUseIdx: 0,
     modelLocationIdx: 0, modelSizeIdx: 2, systemPromptIdx: 0,
     envScore: 5, socialScore: 5, pracScore: 5,
+    envReasons: [], socialReasons: [], pracReasons: [],
     receiptId: null,
     activeKnob1: null, activeKnob2: null, activeSlider: null,
   });
@@ -2016,10 +2090,11 @@ async function printReceipt() {
       env_score:             state.envScore,
       social_score:          state.socialScore,
       prac_score:            state.pracScore,
-      env_summary:           _receiptData.envSummary           || '',
-      social_summary:        _receiptData.socialSummary        || '',
-      practicality_summary:  _receiptData.practicalitySummary  || '',
+      env_reasons:           _receiptData.envReasons           || [],
+      social_reasons:        _receiptData.socialReasons        || [],
+      prac_reasons:          _receiptData.pracReasons          || [],
       story:                 _receiptData.story                || '',
+      failure_note:          _receiptData.failureNote          || '',
       receipt_id:            _receiptData.receiptId            || state.receiptId || '',
     };
     const r = await fetch('/api/print', {
