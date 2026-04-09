@@ -49,6 +49,30 @@ ollama pull llama3.2:3b
 ollama serve
 ```
 
+#### Run Ollama in the background (recommended on Raspberry Pi)
+
+Use the system service so Ollama starts automatically at boot and runs without an open terminal:
+
+```bash
+sudo systemctl enable --now ollama
+```
+
+Check service status and API availability:
+
+```bash
+systemctl status ollama --no-pager
+curl http://127.0.0.1:11434/api/tags
+```
+
+Useful service commands:
+
+```bash
+journalctl -u ollama -f
+sudo systemctl restart ollama
+sudo systemctl stop ollama
+sudo systemctl disable ollama
+```
+
 A larger model produces richer output. To switch models, edit `GENERATION_MODEL` at the top of `app.py`:
 
 ```python
