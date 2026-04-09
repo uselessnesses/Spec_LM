@@ -210,42 +210,66 @@ _receipt_id_lock = threading.Lock()
 
 # ── Load option copy + scoring CSV ───────────────────────────────────────────
 _option_controls = {}
+_options_mtime = None
 
 
 def _load_option_config():
     """
     Load canonical option copy from paper_trail_options.csv.
     """
-    global _option_controls
+    global _option_controls, _options_mtime
     _option_controls = {}
+    _options_mtime = None
 
     if os.path.exists(OPTIONS_PATH):
-        with open(OPTIONS_PATH, newline='') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                control_key = row.get('control_key', '').strip()
-                option_index = int(row['option_index'])
-                option_label = row.get('option_label', '').strip()
-                option_desc = row.get('option_desc', '').strip()
+        try:
+            rows_by_control = {}
+            with open(OPTIONS_PATH, newline='') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    control_key = row.get('control_key', '').strip()
+                    option_label = row.get('option_label', '').strip()
+                    option_desc = row.get('option_desc', '').strip()
+                    if not control_key or not option_label:
+                        continue
+                    try:
+                        option_index = int(str(row.get('option_index', '')).strip())
+                    except ValueError:
+                        # Keep malformed rows deterministic by placing them at the end.
+                        option_index = 10_000
+                    if control_key not in rows_by_control:
+                        rows_by_control[control_key] = []
+                    rows_by_control[control_key].append((option_index, option_label, option_desc))
 
-                if control_key:
-                    if control_key not in _option_controls:
-                        _option_controls[control_key] = {"names": [], "descs": []}
-                    names = _option_controls[control_key]["names"]
-                    descs = _option_controls[control_key]["descs"]
-                    while len(names) <= option_index:
-                        names.append("")
-                        descs.append("")
-                    names[option_index] = option_label
-                    descs[option_index] = option_desc
+            # Build compact arrays in index order (no empty gaps if indices were removed).
+            for control_key, entries in rows_by_control.items():
+                entries.sort(key=lambda item: item[0])
+                _option_controls[control_key] = {
+                    "names": [label for _, label, _ in entries],
+                    "descs": [desc for _, _, desc in entries],
+                }
 
-        print(f"[CONFIG] Loaded option copy for {len(_option_controls)} controls from paper_trail_options.csv")
-        return
+            _options_mtime = os.path.getmtime(OPTIONS_PATH)
+            print(f"[CONFIG] Loaded option copy for {len(_option_controls)} controls from paper_trail_options.csv")
+            return
+        except Exception as e:
+            print(f"[CONFIG] Failed to parse {OPTIONS_PATH}: {e}")
     print(f"[CONFIG] {OPTIONS_PATH} not found - using built-in frontend CTRL defaults")
 
 
 _load_option_config()
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def _maybe_reload_option_config():
+    """Reload options CSV if it changed since the last successful load."""
+    global _options_mtime
+    try:
+        current_mtime = os.path.getmtime(OPTIONS_PATH)
+    except OSError:
+        current_mtime = None
+    if current_mtime != _options_mtime:
+        _load_option_config()
 
 
 def _next_receipt_id():
@@ -795,6 +819,7 @@ def list_ports():
 
 @app.route("/api/options")
 def options_config():
+    _maybe_reload_option_config()
     return {"controls": _option_controls}
 
 

@@ -19,8 +19,8 @@
   --glow:     rgba(0,255,102,0.12);
   --amber:    #ffcc00;
   --red:      #ff4444;
-  --text:     #e0e0e0;
-  --dim:      #777;
+  --text:     #ffffff;
+  --dim:      #ffffff;
   --muted:    #2e2e2e;
   --font:     'Courier New', Courier, monospace;
   --status-h: 44px;
@@ -37,7 +37,7 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.5;
   overflow: hidden;
   user-select: text;
@@ -68,7 +68,7 @@ html, body {
 }
 
 #app-title {
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 2.5px;
   color: var(--accent);
   white-space: nowrap;
@@ -121,14 +121,14 @@ html, body {
 }
 
 .screen-num {
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 3px;
   color: var(--dim);
   margin-bottom: 4px;
 }
 
 .screen-title {
-  font-size: 18px;
+  font-size: 20px;
   letter-spacing: 3px;
   color: var(--text);
   font-weight: normal;
@@ -165,7 +165,7 @@ html, body {
 }
 
 .ctrl-label {
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 3px;
   color: var(--dim);
   align-self: center;
@@ -174,7 +174,7 @@ html, body {
 }
 
 .ctrl-name {
-  font-size: 14px;
+  font-size: 16px;
   letter-spacing: 1.5px;
   color: var(--accent);
   text-align: center;
@@ -184,8 +184,8 @@ html, body {
 }
 
 .ctrl-desc {
-  font-size: 14px;
-  color: #bbb;
+  font-size: 16px;
+  color: #fff;
   line-height: 1.65;
   text-align: center;
   flex: 1;
@@ -233,7 +233,7 @@ html, body {
 }
 
 .slider-label-item {
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 1px;
   color: var(--dim);
   text-align: center;
@@ -298,7 +298,7 @@ html, body {
 .dial-label {
   position: absolute;
   font-family: var(--font);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 1px;
   text-align: center;
   cursor: pointer;
@@ -337,7 +337,7 @@ html, body {
   background: #f5f0e8;
   color: #1a1a1a;
   font-family: 'Courier New', Courier, monospace;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.5;
   box-shadow: 0 8px 48px rgba(0,0,0,0.85), 0 2px 8px rgba(0,0,0,0.5);
   transform: translateY(-110%);
@@ -365,18 +365,18 @@ html, body {
 .r-divider-d { border: none; border-top: 1px solid #b0a898; margin: 10px 0; }
 .r-center    { text-align: center; }
 .r-bold      { font-weight: bold; }
-.r-small     { font-size: 11px; color: #666; }
+.r-small     { font-size: 13px; color: #222; }
 .r-story     { color: #222; line-height: 1.6; }
-.r-label     { font-size: 11px; letter-spacing: 1px; color: #888; margin-bottom: 2px; }
+.r-label     { font-size: 13px; letter-spacing: 1px; color: #222; margin-bottom: 2px; }
 .r-value     { color: #111; margin-bottom: 6px; }
 .r-score-block  { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; }
 .r-score-dial   { flex-shrink: 0; }
 .r-score-text   { flex: 1; min-width: 0; }
 .r-score-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
-.r-score-title  { font-size: 13px; letter-spacing: 1px; color: #444; font-weight: bold; }
-.r-score-num    { font-size: 16px; font-weight: bold; white-space: nowrap; }
+.r-score-title  { font-size: 15px; letter-spacing: 1px; color: #222; font-weight: bold; }
+.r-score-num    { font-size: 18px; font-weight: bold; white-space: nowrap; }
 .r-score-reasons{
-  font-size: 10px;
+  font-size: 12px;
   color: #2f2f2f;
   line-height: 1.5;
   font-family: 'Courier New', monospace;
@@ -404,7 +404,7 @@ html, body {
 
 #start-over-btn, #print-btn {
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 2px;
   padding: 10px 24px;
   background: transparent;
@@ -435,7 +435,7 @@ html, body {
 
 .nav-btn {
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 2px;
   padding: 8px 20px;
   background: transparent;
@@ -471,13 +471,13 @@ html, body {
 }
 #gen-overlay.active { display: flex; }
 .gen-msg {
-  font-size: 13px;
+  font-size: 15px;
   letter-spacing: 3px;
   color: var(--dim);
 }
 .gen-story {
   max-width: 360px;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text);
   line-height: 1.65;
   text-align: center;
@@ -513,12 +513,12 @@ html, body {
   align-items: center;
   gap: 5px;
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1.5px;
   color: var(--dim);
   white-space: nowrap;
 }
-#serial-dot { font-size: 8px; color: var(--dim); }
+#serial-dot { font-size: 10px; color: var(--dim); }
 #serial-indicator.connected #serial-dot  { color: var(--accent); }
 #serial-indicator.connected #serial-label { color: var(--accent); }
 #serial-indicator.error #serial-dot   { color: var(--red); }
@@ -551,14 +551,14 @@ html, body {
   font-family: var(--font);
 }
 #port-modal-title {
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 3px;
   color: var(--dim);
   margin-bottom: 4px;
 }
 #port-list { display: flex; flex-direction: column; gap: 6px; }
 #port-list-empty {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--dim);
   letter-spacing: 1px;
   padding: 10px 0;
@@ -574,9 +574,9 @@ html, body {
 }
 .port-row:hover { border-color: var(--accent); background: rgba(255,255,255,0.03); }
 .port-row.likely { border-color: var(--border2); }
-.port-device { font-size: 13px; color: var(--accent); letter-spacing: 1px; }
-.port-desc   { font-size: 11px; color: var(--dim); }
-.port-badge  { font-size: 9px; letter-spacing: 2px; color: var(--accent); margin-top: 2px; }
+.port-device { font-size: 15px; color: var(--accent); letter-spacing: 1px; }
+.port-desc   { font-size: 13px; color: var(--dim); }
+.port-badge  { font-size: 11px; letter-spacing: 2px; color: var(--accent); margin-top: 2px; }
 #port-modal-footer {
   display: flex;
   justify-content: space-between;
@@ -584,7 +584,7 @@ html, body {
   gap: 8px;
   margin-top: 4px;
 }
-#port-modal-note { font-size: 10px; color: var(--dim); letter-spacing: 0.5px; }
+#port-modal-note { font-size: 12px; color: var(--dim); letter-spacing: 0.5px; }
 #port-modal-actions {
   display: flex;
   align-items: center;
@@ -593,7 +593,7 @@ html, body {
 #port-modal-close,
 #port-disconnect {
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 2px;
   background: transparent;
   border: 1px solid var(--border2);
@@ -617,7 +617,7 @@ html, body {
   bottom: 60px;
   right: 12px;
   font-family: var(--font);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--dim);
   line-height: 1.8;
   letter-spacing: 1px;
@@ -1301,6 +1301,7 @@ const state = {
 };
 
 const screenInited = new Set();
+const DEBUG_OVERLAY_ENABLED = false;
 
 /* ============================================================
    STREAMING HELPER
@@ -1902,7 +1903,7 @@ function makeImpactDial(score) {
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${col}" stroke-width="3.5"
       stroke-dasharray="${fillArc} ${circ - fillArc}" stroke-dashoffset="${dashOff}"
       stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})"/>
-    <text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="14" font-weight="bold"
+    <text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="16" font-weight="bold"
       font-family="Courier New" fill="${col}">${score}</text>
   </svg>`;
 }
@@ -1980,10 +1981,10 @@ function renderReceipt(data) {
   const prac = state.pracScore;
 
   body.innerHTML = `
-    <div class="r-center r-small" style="margin-bottom:2px;color:#777;">
+    <div class="r-center r-small" style="margin-bottom:2px;color:#222;">
       RECEIPT ID: ${data.receiptId || 'PT-?????'}
     </div>
-    <div class="r-center r-bold" style="letter-spacing:2px;font-size:10px;margin-bottom:6px;">
+    <div class="r-center r-bold" style="letter-spacing:2px;font-size:12px;margin-bottom:6px;">
       PAPER TRAIL
     </div>
     <hr class="r-divider-d">
@@ -1994,14 +1995,14 @@ function renderReceipt(data) {
     <hr class="r-divider">
 
     <div class="r-label" style="margin-bottom:4px;">SPECS</div>
-    <div style="font-size:10px;color:#555;line-height:1.7;">
-      <div><span style="color:#888;">ORG &nbsp;&nbsp;&nbsp;&nbsp;</span>${orgType}</div>
-      <div><span style="color:#888;">ETHICS &nbsp;</span>${ethical}</div>
-      <div><span style="color:#888;">FUNDING </span>${funding}</div>
-      <div><span style="color:#888;">DATA &nbsp;&nbsp;&nbsp;</span>${dataTypes} / ${dataSrc}</div>
-      <div><span style="color:#888;">USE &nbsp;&nbsp;&nbsp;&nbsp;</span>${dataUse}</div>
-      <div><span style="color:#888;">MODEL &nbsp;&nbsp;</span>${modelSz} &bull; ${modelLoc}</div>
-      <div><span style="color:#888;">PROMPT &nbsp;</span>${sysPrompt}</div>
+    <div style="font-size:12px;color:#222;line-height:1.7;">
+      <div><span style="color:#222;">ORG &nbsp;&nbsp;&nbsp;&nbsp;</span>${orgType}</div>
+      <div><span style="color:#222;">ETHICS &nbsp;</span>${ethical}</div>
+      <div><span style="color:#222;">FUNDING </span>${funding}</div>
+      <div><span style="color:#222;">DATA &nbsp;&nbsp;&nbsp;</span>${dataTypes} / ${dataSrc}</div>
+      <div><span style="color:#222;">USE &nbsp;&nbsp;&nbsp;&nbsp;</span>${dataUse}</div>
+      <div><span style="color:#222;">MODEL &nbsp;&nbsp;</span>${modelSz} &bull; ${modelLoc}</div>
+      <div><span style="color:#222;">PROMPT &nbsp;</span>${sysPrompt}</div>
     </div>
 
     <hr class="r-divider">
@@ -2029,7 +2030,7 @@ function renderReceipt(data) {
 
     <div class="r-center r-small" style="margin-top:8px;">THANK YOU FOR BUILDING</div>
     <div class="r-center r-small">RESPONSIBLY (?)</div>
-    <div class="r-center r-small" style="margin-top:6px;color:#aaa;">&#9632; &#9632; &#9632;</div>
+    <div class="r-center r-small" style="margin-top:6px;color:#222;">&#9632; &#9632; &#9632;</div>
   `;
 
   // Print animation
@@ -2186,7 +2187,7 @@ async function openPortPicker() {
       list.appendChild(row);
     }
   } catch (e) {
-    list.innerHTML = '<div id="port-list-empty">ERROR LOADING PORTS<br><button onclick="openPortPicker()" style="margin-top:10px;font-family:var(--font);font-size:11px;letter-spacing:2px;background:transparent;border:1px solid var(--border2);color:var(--dim);padding:6px 14px;cursor:pointer;">TRY AGAIN</button></div>';
+    list.innerHTML = '<div id="port-list-empty">ERROR LOADING PORTS<br><button onclick="openPortPicker()" style="margin-top:10px;font-family:var(--font);font-size:13px;letter-spacing:2px;background:transparent;border:1px solid var(--border2);color:var(--text);padding:6px 14px;cursor:pointer;">TRY AGAIN</button></div>';
   }
 }
 
@@ -2222,9 +2223,10 @@ function startSerialStatusPoll() {
         label.textContent = 'NO DEVICE';
         ind.title = 'Arduino not found';
       }
-      // Show last raw line from serial port in debug overlay
-      const dbgLine = document.getElementById('dbg-last-line');
-      if (dbgLine) dbgLine.textContent = s.last_line || '—';
+      if (DEBUG_OVERLAY_ENABLED) {
+        const dbgLine = document.getElementById('dbg-last-line');
+        if (dbgLine) dbgLine.textContent = s.last_line || '—';
+      }
     } catch (_) {}
   }, 2000);
 }
@@ -2239,19 +2241,29 @@ function startKnobPoll() {
         btn_back = 0, btn_next = 0, btn_reset = 0
       } = await r.json();
 
-      // Debug display (always updated, even on receipt screen)
-      const k1Pos = state.activeKnob1 ? state.activeKnob1.n : '?';
-      const k2Pos = state.activeKnob2 ? state.activeKnob2.n : '?';
-      const slPos = state.activeSlider ? state.activeSlider.positions : '?';
-      document.getElementById('dbg-k1-raw').textContent  = knob_raw;
-      document.getElementById('dbg-k1-sm').textContent   = knob;
-      document.getElementById('dbg-k1-idx').textContent  = state.activeKnob1 ? mapToIndexInverted(knob, k1Pos) : '—';
-      document.getElementById('dbg-k2-raw').textContent  = knob2_raw;
-      document.getElementById('dbg-k2-sm').textContent   = knob2;
-      document.getElementById('dbg-k2-idx').textContent  = state.activeKnob2 ? mapToIndexInverted(knob2, k2Pos) : '—';
-      document.getElementById('dbg-sl-raw').textContent  = slider_raw;
-      document.getElementById('dbg-sl-sm').textContent   = slider;
-      document.getElementById('dbg-sl-idx').textContent  = state.activeSlider ? mapToIndex(slider, slPos) : '—';
+      if (DEBUG_OVERLAY_ENABLED) {
+        const k1Pos = state.activeKnob1 ? state.activeKnob1.n : '?';
+        const k2Pos = state.activeKnob2 ? state.activeKnob2.n : '?';
+        const slPos = state.activeSlider ? state.activeSlider.positions : '?';
+        const dbgK1Raw = document.getElementById('dbg-k1-raw');
+        const dbgK1Sm  = document.getElementById('dbg-k1-sm');
+        const dbgK1Idx = document.getElementById('dbg-k1-idx');
+        const dbgK2Raw = document.getElementById('dbg-k2-raw');
+        const dbgK2Sm  = document.getElementById('dbg-k2-sm');
+        const dbgK2Idx = document.getElementById('dbg-k2-idx');
+        const dbgSlRaw = document.getElementById('dbg-sl-raw');
+        const dbgSlSm  = document.getElementById('dbg-sl-sm');
+        const dbgSlIdx = document.getElementById('dbg-sl-idx');
+        if (dbgK1Raw) dbgK1Raw.textContent = knob_raw;
+        if (dbgK1Sm)  dbgK1Sm.textContent  = knob;
+        if (dbgK1Idx) dbgK1Idx.textContent = state.activeKnob1 ? mapToIndexInverted(knob, k1Pos) : '—';
+        if (dbgK2Raw) dbgK2Raw.textContent = knob2_raw;
+        if (dbgK2Sm)  dbgK2Sm.textContent  = knob2;
+        if (dbgK2Idx) dbgK2Idx.textContent = state.activeKnob2 ? mapToIndexInverted(knob2, k2Pos) : '—';
+        if (dbgSlRaw) dbgSlRaw.textContent = slider_raw;
+        if (dbgSlSm)  dbgSlSm.textContent  = slider;
+        if (dbgSlIdx) dbgSlIdx.textContent = state.activeSlider ? mapToIndex(slider, slPos) : '—';
+      }
 
       // Hardware navigation buttons (edge-triggered).
       handleHardwareNavButtons(btn_back, btn_next, btn_reset);
@@ -2296,6 +2308,10 @@ function startKnobPoll() {
    INIT
    ============================================================ */
 document.addEventListener('DOMContentLoaded', async () => {
+  if (!DEBUG_OVERLAY_ENABLED) {
+    const dbg = document.getElementById('debug-overlay');
+    if (dbg) dbg.style.display = 'none';
+  }
   await loadOptionsConfig();
   buildProgressBar();
   startKnobPoll();
