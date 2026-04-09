@@ -296,6 +296,7 @@ ENV_BASE = {
         "Runs on devices locally": 1,
         "Hosted by the organisation": 0,
         "Decentralised": 0,
+        "Outsourced to a tech giant": -1,
         "Outsourced to third party": -1,
     },
     "data_source": {
@@ -310,29 +311,69 @@ ENV_BASE = {
 
 ENV_COMBOS = [
     {
-        "conditions": {"model_size": "140B", "model_location": "Outsourced to third party"},
+        "conditions": {"model_size": "140B", "model_location": "Outsourced to a tech giant"},
         "modifier": -2,
-        "reason": "A frontier-scale model running on cloud servers has a massive and ongoing energy footprint, often powered by fossil fuels.",
+        "reason": "A very large model on third-party cloud servers uses a lot of power over time, and that power may come from fossil fuels.",
+    },
+        {
+        "conditions": {"model_size": "140B", "model_location": "Hosted by the organisation"},
+        "modifier": -2,
+        "reason": "A 140B model hosted by the organisation still needs a lot of server power every day.",
+    },
+    {
+        "conditions": {"model_size": "140B", "model_location": "Decentralised"},
+        "modifier": -3,
+        "reason": "A decentralised 140B setup repeats heavy compute across many machines, so total energy use becomes very high.",
     },
     {
         "conditions": {"model_size": "1B", "model_location": "Runs on devices locally"},
         "modifier": 2,
-        "reason": "A small model on local hardware has near-zero environmental overhead.",
+        "reason": "A small model running on local devices usually has a very low energy cost.",
+    },
+    {
+        "conditions": {"model_size": "7B", "model_location": "Runs on devices locally"},
+        "modifier": 1,
+        "reason": "A 7B model can run well on many modern devices, which helps keep energy use lower.",
+    },
+    {
+        "conditions": {"model_size": "14B", "model_location": "Runs on devices locally"},
+        "modifier": 1,
+        "reason": "A 14B model running locally can reduce reliance on always-on central servers.",
+    },
+    {
+        "conditions": {"model_size": "7B", "model_location": "Hosted by the organisation"},
+        "modifier": 1,
+        "reason": "A 7B model hosted by the organisation can be run efficiently without the heavy power use of very large models.",
+    },
+    {
+        "conditions": {"model_size": "14B", "model_location": "Hosted by the organisation"},
+        "modifier": 1,
+        "reason": "A 14B model hosted by the organisation can be scheduled and managed to use power more efficiently.",
+    },
+    {
+        "conditions": {"model_size": "7B", "model_location": "Decentralised"},
+        "modifier": 1,
+        "reason": "A decentralised 7B model can share work across many devices, which can reduce pressure on big data centres.",
+    },
+    {
+        "conditions": {"model_size": "14B", "model_location": "Decentralised"},
+        "modifier": 1,
+        "reason": "A decentralised 14B setup can make better use of existing hardware when the work is shared well.",
     },
     {
         "conditions": {"ethical": "Justice and rights centred", "model_size": "1B"},
         "modifier": 1,
-        "reason": "Choosing a small model reflects a genuine commitment to minimising environmental harm.",
+        "reason": "Choosing a small model shows a clear effort to reduce environmental harm.",
     },
     {
-        "conditions": {"ethical": "Fully extractive", "model_size": "140B"},
+        "conditions": {"ethical": "Harm-tolerant", "model_size": "140B"},
         "modifier": -1,
-        "reason": "No incentive to optimise for efficiency when the goal is maximum extraction.",
+        "reason": "When the goal is extraction, there is little reason to reduce environmental damage.",
     },
     {
         "conditions": {"org_type": "Mega-corporation", "model_size": "140B"},
         "modifier": -1,
-        "reason": "At mega-corporation scale, the energy cost of a frontier model is multiplied across millions of users.",
+        "reason": "At mega-corporation scale, a 140B model can use huge amounts of energy.",
     },
 ]
 
@@ -358,7 +399,7 @@ SOCIAL_COMBOS = [
     {
         "conditions": {"org_type": "Public / governmental", "ethical": "Fully extractive"},
         "modifier": -4,
-        "reason": "A public body using extractive practices betrays the citizens it is supposed to serve.",
+        "reason": "A public body using extractive practices could harm the citizens it is supposed to serve.",
     },
     {
         "conditions": {"org_type": "Public / governmental", "ethical": "Harm-tolerant"},
@@ -450,6 +491,66 @@ SOCIAL_COMBOS = [
         "modifier": -3,
         "reason": "A mega-corporation extracting value from social media data at scale is surveillance capitalism in its purest form.",
     },
+    {
+        "conditions": {"org_type": "Public / governmental", "funding": "Government grants", "ethical": "Transparent and careful"},
+        "modifier": 2,
+        "reason": "Public funding with a careful, transparent approach can build trust because people can see how decisions are made.",
+    },
+    {
+        "conditions": {"org_type": "Public / governmental", "funding": "Government grants", "ethical": "Harm-tolerant"},
+        "modifier": -4,
+        "reason": "A public body using taxpayer money while tolerating harm breaks public trust.",
+    },
+    {
+        "conditions": {"org_type": "Public / governmental", "funding": "Rich sponsor"},
+        "modifier": -3,
+        "reason": "A public body funded by one rich sponsor risks private influence over public decisions.",
+    },
+    {
+        "conditions": {"org_type": "Public / governmental", "funding": "Pay-per-use"},
+        "modifier": -2,
+        "reason": "Pay-per-use in a public service can shut out people who need support but cannot pay.",
+    },
+    {
+        "conditions": {"org_type": "Community group", "funding": "Big loan", "ethical": "Growth-first"},
+        "modifier": -3,
+        "reason": "Debt and growth pressure can push a community group to prioritise repayment over people.",
+    },
+    {
+        "conditions": {"org_type": "Community group", "funding": "Pay-per-use", "ethical": "Justice and rights centred"},
+        "modifier": -2,
+        "reason": "A pay-per-use model can conflict with a rights-centred promise if people are priced out.",
+    },
+    {
+        "conditions": {"org_type": "Research institute", "funding": "Rich sponsor", "ethical": "Growth-first"},
+        "modifier": -3,
+        "reason": "A rich sponsor plus growth-first pressure can weaken research independence.",
+    },
+    {
+        "conditions": {"org_type": "Research institute", "funding": "Government grants", "ethical": "Transparent and careful"},
+        "modifier": 2,
+        "reason": "Public grants and careful governance are a strong social fit for independent research.",
+    },
+    {
+        "conditions": {"org_type": "Startup", "funding": "Big loan", "ethical": "Harm-tolerant"},
+        "modifier": -3,
+        "reason": "A startup under loan pressure that tolerates harm is likely to cut safety to stay afloat.",
+    },
+    {
+        "conditions": {"org_type": "Startup", "funding": "Subscription based", "ethical": "Transparent and careful"},
+        "modifier": 1,
+        "reason": "A subscription model with careful governance can support steady growth without constant pressure to exploit users.",
+    },
+    {
+        "conditions": {"org_type": "Mega-corporation", "funding": "Government grants", "ethical": "Growth-first"},
+        "modifier": -3,
+        "reason": "Public grants used by a growth-first mega-corporation can shift public value into private power.",
+    },
+    {
+        "conditions": {"org_type": "Mega-corporation", "funding": "Pay-per-use", "ethical": "Harm-tolerant"},
+        "modifier": -3,
+        "reason": "Charging by use while tolerating harm can lock vulnerable users into costly, unsafe systems.",
+    },
 ]
 
 PRACTICALITY_BASE = {}
@@ -471,9 +572,79 @@ PRACTICALITY_COMBOS = [
         "reason": "A 14B model can technically run on high-end consumer hardware, but performance will be poor and battery life terrible.",
     },
     {
+        "conditions": {"model_size": "7B", "model_location": "Runs on devices locally"},
+        "modifier": 1,
+        "reason": "A 7B model can run locally on stronger consumer hardware, so this setup is realistic for many teams.",
+    },
+    {
+        "conditions": {"model_size": "1B", "model_location": "Hosted by the organisation"},
+        "modifier": -1,
+        "reason": "Hosting a 1B model on servers can be unnecessary overhead when it could run locally.",
+    },
+    {
+        "conditions": {"model_size": "14B", "model_location": "Hosted by the organisation"},
+        "modifier": 1,
+        "reason": "A 14B model hosted by the organisation is demanding but usually workable with modest server hardware.",
+    },
+    {
+        "conditions": {"model_size": "80B", "model_location": "Hosted by the organisation"},
+        "modifier": -4,
+        "reason": "An 80B model needs expensive hardware and ongoing operations that many teams cannot sustain.",
+    },
+    {
+        "conditions": {"model_size": "140B", "model_location": "Hosted by the organisation"},
+        "modifier": -6,
+        "reason": "A 140B model hosted in-house requires very large infrastructure and specialist staff.",
+    },
+    {
         "conditions": {"model_size": "140B", "model_location": "Decentralised"},
         "modifier": -6,
         "reason": "Coordinating a frontier-scale model across decentralised nodes is an unsolved engineering problem.",
+    },
+    {
+        "conditions": {"model_size": "80B", "model_location": "Decentralised"},
+        "modifier": -5,
+        "reason": "An 80B model is very hard to run in a decentralised way because each node needs heavy compute.",
+    },
+    {
+        "conditions": {"model_size": "14B", "model_location": "Decentralised"},
+        "modifier": -2,
+        "reason": "A decentralised 14B model is possible but difficult to run reliably across mixed hardware.",
+    },
+    {
+        "conditions": {"model_size": "7B", "model_location": "Decentralised"},
+        "modifier": -1,
+        "reason": "Decentralising a 7B model can work, but coordination overhead often slows delivery.",
+    },
+    {
+        "conditions": {"model_size": "1B", "model_location": "Decentralised"},
+        "modifier": -2,
+        "reason": "A decentralised setup for a 1B model adds complexity for little practical gain.",
+    },
+    {
+        "conditions": {"model_size": "1B", "model_location": "Outsourced to a tech giant"},
+        "modifier": -2,
+        "reason": "Using a tech giant for a 1B model is usually overkill and adds avoidable vendor dependency.",
+    },
+    {
+        "conditions": {"model_size": "7B", "model_location": "Outsourced to a tech giant"},
+        "modifier": -1,
+        "reason": "A 7B model can often be hosted directly, so outsourcing may add extra cost and lock-in.",
+    },
+    {
+        "conditions": {"model_size": "14B", "model_location": "Outsourced to a tech giant"},
+        "modifier": 1,
+        "reason": "Outsourcing a 14B model can be practical when a team lacks in-house infrastructure.",
+    },
+    {
+        "conditions": {"model_size": "80B", "model_location": "Outsourced to a tech giant"},
+        "modifier": 2,
+        "reason": "Outsourcing an 80B model is often the most practical way to access this scale.",
+    },
+    {
+        "conditions": {"model_size": "140B", "model_location": "Outsourced to a tech giant"},
+        "modifier": 2,
+        "reason": "For 140B models, outsourcing is one of the few practical options for most organisations.",
     },
     {
         "conditions": {"org_type": "Community group", "model_size": "140B"},
@@ -578,7 +749,7 @@ PRACTICALITY_COMBOS = [
     {
         "conditions": {"data_use": "Unsupervised", "ethical": "Justice and rights centred"},
         "modifier": -2,
-        "reason": "Unsupervised training with no human guidance is hard to reconcile with a justice-centred approach - harmful patterns go unchecked.",
+        "reason": "Unsupervised training with no human guidance is hard to reconcile with a justice-centred approach.",
     },
     {
         "conditions": {"data_use": "Fine-tuned", "data_type": "Client / task specific"},
@@ -587,12 +758,29 @@ PRACTICALITY_COMBOS = [
     },
 ]
 
+CHOICE_VALUE_ALIASES = {
+    "model_location": {
+        "Outsourced to third party": "Outsourced to a tech giant",
+    },
+}
+
+RECEIPT_REASON_LIMIT = 3
+
+
+def _normalise_choices(choices):
+    normalised = dict(choices)
+    for key, aliases in CHOICE_VALUE_ALIASES.items():
+        value = normalised.get(key)
+        if isinstance(value, str):
+            normalised[key] = aliases.get(value, value)
+    return normalised
+
 
 def _rule_matches(conditions, choices):
     return all(choices.get(k) == v for k, v in conditions.items())
 
 
-def _pick_top_reasons(triggered, limit=4):
+def _pick_top_reasons(triggered, limit=RECEIPT_REASON_LIMIT):
     ranked = sorted(
         enumerate(triggered),
         key=lambda item: (-abs(int(item[1].get("modifier", 0))), item[0]),
@@ -619,7 +807,7 @@ def _score_dimension(base_map, combo_rules, choices):
             })
 
     top_reasons = [
-        t["reason"] for t in _pick_top_reasons(triggered, limit=4) if t.get("reason")
+        t["reason"] for t in _pick_top_reasons(triggered, limit=RECEIPT_REASON_LIMIT) if t.get("reason")
     ]
     return {
         "score": max(1, min(10, score)),
@@ -634,10 +822,11 @@ def calculate_scores(choices):
     org_type, ethical, funding, data_type, data_source, data_use,
     model_location, model_size, system_prompt
     """
+    normalised_choices = _normalise_choices(choices)
     return {
-        "environmental": _score_dimension(ENV_BASE, ENV_COMBOS, choices),
-        "social": _score_dimension(SOCIAL_BASE, SOCIAL_COMBOS, choices),
-        "practicality": _score_dimension(PRACTICALITY_BASE, PRACTICALITY_COMBOS, choices),
+        "environmental": _score_dimension(ENV_BASE, ENV_COMBOS, normalised_choices),
+        "social": _score_dimension(SOCIAL_BASE, SOCIAL_COMBOS, normalised_choices),
+        "practicality": _score_dimension(PRACTICALITY_BASE, PRACTICALITY_COMBOS, normalised_choices),
     }
 
 
@@ -1142,7 +1331,7 @@ def _build_print_commands(data):
         cmds.append(f"SCORE:{score}")
         if not isinstance(reasons, list):
             reasons = []
-        reasons = reasons[:4]
+        reasons = reasons[:RECEIPT_REASON_LIMIT]
         if reasons:
             for reason in reasons:
                 reason_lines = textwrap.wrap(str(reason), WRAP - 2) or [""]

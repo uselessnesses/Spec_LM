@@ -1238,7 +1238,7 @@ ORG_TYPE: {
   },
 
   MODEL_LOCATION: {
-    names: ['Runs on devices locally', 'Hosted by the organisation', 'Decentralised', 'Outsourced to third party'],
+    names: ['Runs on devices locally', 'Hosted by the organisation', 'Decentralised', 'Outsourced to a tech giant'],
     descs: [
       'The model runs on the user\'s own phone, laptop, or local hardware. Maximum privacy because data never leaves the device, but only small models can run this way and performance depends on the user\'s hardware.',
       'The organisation runs the model on its own servers and hardware. Full control over the data and no dependency on outside companies, but requires significant upfront investment and ongoing maintenance.',
@@ -1918,7 +1918,7 @@ function escapeHtml(s) {
 }
 
 function makeReasonLines(reasons) {
-  const list = Array.isArray(reasons) ? reasons.slice(0, 4) : [];
+  const list = Array.isArray(reasons) ? reasons.slice(0, 3) : [];
   if (!list.length) {
     return '<div class="r-score-reason">&gt; No major combination rules triggered.</div>';
   }
