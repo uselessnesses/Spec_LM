@@ -748,6 +748,7 @@ def generate():
         "Respond in EXACTLY this format:\n\n"
         "STORY:\n"
         "[Maximum 30 words. One sentence. Objective and specific. "
+        "Use only SOCIAL IMPACT and PRACTICALITY flags/reasons for your explanation. Ignore environmental flags. "
         "Include a lifespan estimate in years and a clear cause from the choices above. "
         "Examples of acceptable framing: 'Likely lifespan: 2-3 years, because ...' or "
         "'The organisation was still going after 45 years due to ...'. "
@@ -896,7 +897,15 @@ def _story_looks_flowery(text):
 
 def _story_mentions_score_tension(text):
     return re.search(
-        r"\b(environment|social|practical|fund|grant|loan|subscription|data|model|compute|cost|feasib|viab|sustain|risk|impact)\w*\b",
+        r"\b(social|practical|fund|grant|loan|subscription|data|model|compute|cost|feasib|viab|sustain|risk|impact|trust|consent|adoption|safeguard)\w*\b",
+        text,
+        flags=re.IGNORECASE,
+    ) is not None
+
+
+def _story_mentions_environment_dimension(text):
+    return re.search(
+        r"\b(environment|environmental|carbon|emission|climate|ecology|biodiversity)\w*\b",
         text,
         flags=re.IGNORECASE,
     ) is not None
@@ -962,8 +971,8 @@ def _harm_phrase_from_reasons(reasons):
     return "people being harmed through unfair deployment"
 
 
-def _estimate_lifespan_phrase(env_score, social_score, prac_score):
-    viability = (0.5 * float(prac_score)) + (0.3 * float(social_score)) + (0.2 * float(env_score))
+def _estimate_lifespan_phrase(social_score, prac_score):
+    viability = (0.6 * float(prac_score)) + (0.4 * float(social_score))
     if viability <= 2.5:
         return "under 1 year"
     if viability <= 3.5:
@@ -982,16 +991,14 @@ def _estimate_lifespan_phrase(env_score, social_score, prac_score):
 
 
 def _fallback_story_from_scores(data):
-    env = int(data.get("env_score", 5))
     social = int(data.get("social_score", 5))
     prac = int(data.get("prac_score", 5))
     dims = [
-        ("environmental", env, data.get("env_reasons", [])),
         ("social", social, data.get("social_reasons", [])),
         ("practicality", prac, data.get("prac_reasons", [])),
     ]
     worst_key, _, _ = min(dims, key=lambda x: x[1])
-    lifespan = _estimate_lifespan_phrase(env, social, prac)
+    lifespan = _estimate_lifespan_phrase(social, prac)
 
     snippet = ""
     snippet_words = 7 if social <= LOW_SOCIAL_HARM_THRESHOLD else 9
@@ -1004,7 +1011,6 @@ def _fallback_story_from_scores(data):
     low_social = social <= LOW_SOCIAL_HARM_THRESHOLD
     harm_phrase = _harm_phrase_from_reasons(
         (data.get("social_reasons", []) or [])
-        + (data.get("env_reasons", []) or [])
         + (data.get("prac_reasons", []) or [])
     )
 
@@ -1048,6 +1054,7 @@ def _sanitize_story_for_receipt(story_text, data):
         or clean.count(".") + clean.count("!") + clean.count("?") > 1
         or _story_looks_like_named_org(clean)
         or _story_looks_flowery(clean)
+        or _story_mentions_environment_dimension(clean)
         or _story_too_score_focused(clean)
         or not _story_mentions_lifespan(clean)
         or not _story_has_causal_link(clean)
@@ -1069,9 +1076,6 @@ def _build_print_commands(data):
     WRAP = 32   # characters per line at small font
     DASH_LINE = "TEXT:--------------------------------"
     receipt_id = str(data.get("receipt_id", "PT-?????"))
-
-    def wrap(text):
-        return textwrap.wrap(str(text), WRAP) or [""]
 
     cmds = []
     cmds.append("PRINT_START")
@@ -1124,13 +1128,6 @@ def _build_print_commands(data):
             cmds.append("TEXT:> No major combination rules triggered.")
         cmds.append("FEED:1")
         cmds.append(DASH_LINE)
-
-    # ── Story ─────────────────────────────────────────────────────────────────
-    story_text = _sanitize_story_for_receipt(data.get("story", ""), data)
-    cmds += ["BOLD_ON", "TEXT:COMPANY STORY", "BOLD_OFF", DASH_LINE]
-    for line in wrap(story_text):
-        cmds.append(f"TEXT:{line}")
-    cmds.append(DASH_LINE)
 
     # ── Response field ────────────────────────────────────────────────────────
     cmds += ["BOLD_ON", "TEXT:YOUR RESPONSE", "BOLD_OFF", DASH_LINE]
