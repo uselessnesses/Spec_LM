@@ -1592,6 +1592,7 @@ async function generateFinal() {
   state.envReasons = [];
   state.socialReasons = [];
   state.pracReasons = [];
+  _receiptData = null;
   overlay.classList.add('active');
 
   const payload = {
@@ -1620,9 +1621,16 @@ async function generateFinal() {
     let scoresExtracted = false;
     let scoreDataExtracted = false;
     let receiptIdExtracted = false;
+    let autoPrintTriggered = false;
 
     await streamLLM('/api/generate', payload, (buf) => {
       fullBuf = buf;
+      const maybeTriggerAutoPrint = () => {
+        if (autoPrintTriggered) return;
+        if (!scoreDataExtracted || !receiptIdExtracted) return;
+        autoPrintTriggered = true;
+        void sendPrintJob(buildThermalPrintPayload(), { showAlerts: true });
+      };
       // Extract metadata from stream preamble.
       if (!scoresExtracted) {
         const m = buf.match(/^__SCORES__:(\d+),(\d+),(\d+)$/m);
@@ -1648,6 +1656,7 @@ async function generateFinal() {
             state.socialReasons = Array.isArray(soc.reasons) ? soc.reasons : [];
             state.pracReasons = Array.isArray(pra.reasons) ? pra.reasons : [];
             scoreDataExtracted = true;
+            maybeTriggerAutoPrint();
           } catch (_) {}
         }
       }
@@ -1656,6 +1665,7 @@ async function generateFinal() {
         if (m) {
           state.receiptId = m[1].trim();
           receiptIdExtracted = true;
+          maybeTriggerAutoPrint();
         }
       }
       // Show story in overlay as it streams
@@ -1668,7 +1678,7 @@ async function generateFinal() {
     overlay.classList.remove('active');
     renderReceipt(parsed);
     showScreen(3);
-    await autoSaveAndPrintReceipt();
+    await autoSaveReceiptPngAfterRender();
   } catch (e) {
     overlay.classList.remove('active');
     renderReceipt({
@@ -1679,7 +1689,7 @@ async function generateFinal() {
       receiptId: state.receiptId,
     });
     showScreen(3);
-    await autoSaveAndPrintReceipt();
+    await autoSaveReceiptPngAfterRender();
   } finally {
     state.isGenerating = false;
   }
@@ -1716,7 +1726,11 @@ function storyLooksFlowery(text) {
 }
 
 function storyMentionsScoreTension(text) {
-  return /\b(environment|social|practical|fund|grant|loan|subscription|data|model|compute|cost|feasib|viab|sustain|risk|impact)\w*\b/i.test(text);
+  return /\b(social|practical|fund|grant|loan|subscription|data|model|compute|cost|feasib|viab|sustain|risk|impact|trust|consent|adoption|safeguard)\w*\b/i.test(text);
+}
+
+function storyMentionsEnvironmentalDimension(text) {
+  return /\b(environment|environmental|carbon|emission|climate|ecology|biodiversity)\w*\b/i.test(text);
 }
 
 function storyMentionsLifespan(text) {
@@ -1747,8 +1761,8 @@ function harmPhraseFromReasons(reasons) {
   return 'people being harmed through unfair deployment';
 }
 
-function estimateLifespanPhrase(envScore, socialScore, pracScore) {
-  const viability = (0.5 * Number(pracScore || 5)) + (0.3 * Number(socialScore || 5)) + (0.2 * Number(envScore || 5));
+function estimateLifespanPhrase(socialScore, pracScore) {
+  const viability = (0.6 * Number(pracScore || 5)) + (0.4 * Number(socialScore || 5));
   if (viability <= 2.5) return 'under 1 year';
   if (viability <= 3.5) return '1-2 years';
   if (viability <= 4.5) return '2-3 years';
@@ -1761,7 +1775,6 @@ function estimateLifespanPhrase(envScore, socialScore, pracScore) {
 
 function buildObjectiveStoryFallback() {
   const dims = [
-    { key: 'environmental', score: Number(state.envScore) || 5, reasons: state.envReasons || [] },
     { key: 'social', score: Number(state.socialScore) || 5, reasons: state.socialReasons || [] },
     { key: 'practicality', score: Number(state.pracScore) || 5, reasons: state.pracReasons || [] },
   ];
@@ -1781,8 +1794,8 @@ function buildObjectiveStoryFallback() {
     }
   }
 
-  const lifespan = estimateLifespanPhrase(state.envScore, state.socialScore, state.pracScore);
-  const harm = harmPhraseFromReasons([...(state.socialReasons || []), ...(state.envReasons || []), ...(state.pracReasons || [])]);
+  const lifespan = estimateLifespanPhrase(state.socialScore, state.pracScore);
+  const harm = harmPhraseFromReasons([...(state.socialReasons || []), ...(state.pracReasons || [])]);
   let text = '';
   if (lowSocial && reason) {
     text = `Expected lifespan is ${lifespan} because ${reason}; harm included ${harm}.`;
@@ -1821,6 +1834,7 @@ function sanitizeStoryText(rawStory, { allowFallback = true } = {}) {
     ((text.match(/[.!?]/g) || []).length > 1) ||
     storyLooksLikeNamedOrg(text) ||
     storyLooksFlowery(text) ||
+    storyMentionsEnvironmentalDimension(text) ||
     storyTooScoreFocused(text) ||
     !storyMentionsLifespan(text) ||
     !storyHasCausalLink(text) ||
@@ -1927,6 +1941,24 @@ function makeScoreBlock(title, score, reasons) {
 }
 
 let _receiptData = null;
+let _printInProgress = false;
+
+function syncPrintButtonState() {
+  const printBtn = document.getElementById('print-btn');
+  if (!printBtn) return;
+  if (_printInProgress) {
+    printBtn.disabled = true;
+    printBtn.textContent = '\u2026 PRINTING';
+    return;
+  }
+  if (_receiptData) {
+    printBtn.disabled = false;
+    printBtn.textContent = '\u2399 PRINT';
+  } else {
+    printBtn.disabled = true;
+    printBtn.textContent = '\u2399 PRINT';
+  }
+}
 
 function renderReceipt(data) {
   _receiptData = { ...data };
@@ -1974,14 +2006,14 @@ function renderReceipt(data) {
 
     <hr class="r-divider">
 
-    ${makeScoreBlock('ENVIRONMENTAL IMPACT', env,  data.envReasons)}
-    ${makeScoreBlock('SOCIAL IMPACT',        soc,  data.socialReasons)}
-    ${makeScoreBlock('PRACTICALITY',         prac, data.pracReasons)}
+    <div class="r-label" style="margin-bottom:6px;">COMPANY STORY</div>
+    <div class="r-story r-bold">${data.story || '—'}</div>
 
     <hr class="r-divider">
 
-    <div class="r-label" style="margin-bottom:6px;">COMPANY STORY</div>
-    <div class="r-story">${data.story || '—'}</div>
+    ${makeScoreBlock('ENVIRONMENTAL IMPACT', env,  data.envReasons)}
+    ${makeScoreBlock('SOCIAL IMPACT',        soc,  data.socialReasons)}
+    ${makeScoreBlock('PRACTICALITY',         prac, data.pracReasons)}
 
     <hr class="r-divider">
 
@@ -2016,9 +2048,8 @@ function renderReceipt(data) {
     wrap.style.overflow = 'visible';
   }, { once: true });
 
-  // Enable print button now that receipt data is ready
-  const printBtn = document.getElementById('print-btn');
-  if (printBtn) printBtn.disabled = false;
+  // Enable print button when the auto-print job is not in progress.
+  syncPrintButtonState();
 }
 
 /* ============================================================
@@ -2049,8 +2080,8 @@ function startOver() {
   document.getElementById('receipt-body').innerHTML = '';
   document.getElementById('receipt-printer-wrap').style.overflow = 'hidden';
   _receiptData = null;
-  const printBtn = document.getElementById('print-btn');
-  if (printBtn) { printBtn.disabled = true; printBtn.textContent = '\u2399 PRINT'; }
+  _printInProgress = false;
+  syncPrintButtonState();
 
   _lastK1Idx = -1; _lastK2Idx = -1; _lastSlIdx = -1;
   _lastK1Raw = -1; _lastK2Raw = -1; _lastSlRaw = -1;
@@ -2288,48 +2319,56 @@ document.addEventListener('DOMContentLoaded', async () => {
 /* ============================================================
    PRINT RECEIPT (thermal printer via Arduino)
    ============================================================ */
-async function printReceipt() {
-  if (!_receiptData) return;
-  const btn = document.getElementById('print-btn');
-  btn.disabled = true;
-  btn.textContent = '\u2026 PRINTING';
+function buildThermalPrintPayload() {
+  return {
+    org_type:              CTRL.ORG_TYPE.names[state.orgTypeIdx],
+    ethical:               CTRL.ETHICAL.names[state.ethicalIdx],
+    funding:               CTRL.FUNDING.names[state.fundingIdx],
+    data_types:            CTRL.DATA_TYPES.names[state.dataTypesIdx],
+    data_source:           CTRL.DATA_SOURCE.names[state.dataSourceIdx],
+    data_use:              CTRL.DATA_USE.names[state.dataUseIdx],
+    model_size:            CTRL.MODEL_SIZE.names[state.modelSizeIdx],
+    model_location:        CTRL.MODEL_LOCATION.names[state.modelLocationIdx],
+    system_prompt:         CTRL.SYSTEM_PROMPT.names[state.systemPromptIdx],
+    env_score:             state.envScore,
+    social_score:          state.socialScore,
+    prac_score:            state.pracScore,
+    env_reasons:           (_receiptData && _receiptData.envReasons)    || state.envReasons    || [],
+    social_reasons:        (_receiptData && _receiptData.socialReasons) || state.socialReasons || [],
+    prac_reasons:          (_receiptData && _receiptData.pracReasons)   || state.pracReasons   || [],
+    receipt_id:            (_receiptData && _receiptData.receiptId)     || state.receiptId || '',
+  };
+}
+
+async function sendPrintJob(payload, { showAlerts = true } = {}) {
+  if (_printInProgress) return { ok: false, error: 'Print already in progress' };
+  _printInProgress = true;
+  syncPrintButtonState();
   try {
-    const payload = {
-      org_type:              CTRL.ORG_TYPE.names[state.orgTypeIdx],
-      ethical:               CTRL.ETHICAL.names[state.ethicalIdx],
-      funding:               CTRL.FUNDING.names[state.fundingIdx],
-      data_types:            CTRL.DATA_TYPES.names[state.dataTypesIdx],
-      data_source:           CTRL.DATA_SOURCE.names[state.dataSourceIdx],
-      data_use:              CTRL.DATA_USE.names[state.dataUseIdx],
-      model_size:            CTRL.MODEL_SIZE.names[state.modelSizeIdx],
-      model_location:        CTRL.MODEL_LOCATION.names[state.modelLocationIdx],
-      system_prompt:         CTRL.SYSTEM_PROMPT.names[state.systemPromptIdx],
-      env_score:             state.envScore,
-      social_score:          state.socialScore,
-      prac_score:            state.pracScore,
-      env_reasons:           _receiptData.envReasons           || [],
-      social_reasons:        _receiptData.socialReasons        || [],
-      prac_reasons:          _receiptData.pracReasons          || [],
-      story:                 sanitizeStoryText(_receiptData.story || '', { allowFallback: true }),
-      receipt_id:            _receiptData.receiptId            || state.receiptId || '',
-    };
     const r = await fetch('/api/print', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     const result = await r.json();
-    if (!result.ok) alert('Print failed: ' + (result.error || 'unknown error'));
+    if (!result.ok && showAlerts) alert('Print failed: ' + (result.error || 'unknown error'));
+    return result;
   } catch (e) {
-    alert('Print failed: ' + e.message);
+    if (showAlerts) alert('Print failed: ' + e.message);
+    return { ok: false, error: e.message };
   } finally {
-    btn.disabled = false;
-    btn.textContent = '\u2399 PRINT';
+    _printInProgress = false;
+    syncPrintButtonState();
   }
 }
 
+async function printReceipt() {
+  if (!_receiptData) return;
+  await sendPrintJob(buildThermalPrintPayload(), { showAlerts: true });
+}
+
 /* ============================================================
-   AUTO SAVE + PRINT
+   AUTO SAVE PNG
    ============================================================ */
 async function saveReceiptPngToWorkspace() {
   try {
@@ -2357,11 +2396,10 @@ async function saveReceiptPngToWorkspace() {
   }
 }
 
-async function autoSaveAndPrintReceipt() {
+async function autoSaveReceiptPngAfterRender() {
   // Wait until the receipt feed animation finishes before snapshotting.
   await new Promise((resolve) => setTimeout(resolve, 1400));
   await saveReceiptPngToWorkspace();
-  await printReceipt();
 }
 </script>
 
