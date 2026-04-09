@@ -46,6 +46,8 @@ _serial_status        = {"connected": False, "port": None, "error": None, "last_
 _user_port_override   = None          # set via /api/set-port
 _serial_restart_event = threading.Event()
 _ser_obj              = None          # active Serial instance, set by _serial_reader
+_MANUAL_DISCONNECT_TOKEN = "__MANUAL_DISCONNECT__"
+_SERIAL_RETRY_LOG_INTERVAL_S = 20.0
 
 
 def _list_candidate_ports():
@@ -60,6 +62,17 @@ def _list_candidate_ports():
     return candidates
 
 
+def _list_available_ports_strings():
+    """Human-readable list of all serial ports currently visible to pyserial."""
+    if not _SERIAL_AVAILABLE:
+        return []
+    out = []
+    for p in serial.tools.list_ports.comports():
+        desc = p.description or "Unknown device"
+        out.append(f"{p.device} ({desc})")
+    return out
+
+
 def _serial_reader():
     global _knob_value, _knob2_value, _slider_value
     global _knob_raw, _knob2_raw, _slider_raw
@@ -69,28 +82,73 @@ def _serial_reader():
     if not _SERIAL_AVAILABLE:
         _serial_status = {"connected": False, "port": None, "error": "pyserial not installed"}
         return
+
+    last_log_key = None
+    last_log_time = 0.0
+
+    def throttled_log(key, msg):
+        nonlocal last_log_key, last_log_time
+        now = time.monotonic()
+        if key != last_log_key or (now - last_log_time) >= _SERIAL_RETRY_LOG_INTERVAL_S:
+            print(msg)
+            last_log_key = key
+            last_log_time = now
+
     while True:
+        # Manual disconnect mode: stay detached until user picks a port.
+        if _user_port_override == _MANUAL_DISCONNECT_TOKEN:
+            last_line = _serial_status.get("last_line", "")
+            _serial_status = {
+                "connected": False,
+                "port": None,
+                "error": "Disconnected by user. Click NO DEVICE to pick a port.",
+                "last_line": last_line,
+            }
+            throttled_log("manual_disconnect", "[SERIAL] Manually disconnected. Waiting for port selection...")
+            _serial_restart_event.wait(timeout=1)
+            _serial_restart_event.clear()
+            continue
+
         # Resolve port: user override → hardcoded → auto-detect
         port = _user_port_override or SERIAL_PORT
         if not port:
             candidates = _list_candidate_ports()
             port = candidates[0] if candidates else None
-            if candidates:
-                print(f"[SERIAL] Auto-detected ports: {candidates}")
+
         if not port:
-            _serial_status = {"connected": False, "port": None,
-                              "error": "No Arduino found. Plug in USB and wait, or click NO DEVICE to pick a port."}
-            print(f"[SERIAL] {_serial_status['error']} Retrying in 3s…")
+            all_ports = _list_available_ports_strings()
+            last_line = _serial_status.get("last_line", "")
+            _serial_status = {
+                "connected": False,
+                "port": None,
+                "error": "No Arduino found. Plug in USB and wait, or click NO DEVICE to pick a port.",
+                "last_line": last_line,
+            }
+            if all_ports:
+                preview = ", ".join(all_ports[:6])
+                if len(all_ports) > 6:
+                    preview += ", ..."
+                throttled_log(
+                    ("no_arduino", tuple(all_ports)),
+                    f"[SERIAL] No likely Arduino port yet. Available serial ports: {preview}. Retrying in 3s...",
+                )
+            else:
+                throttled_log(
+                    "no_serial_ports",
+                    "[SERIAL] No serial ports detected. Plug in USB and wait, or click NO DEVICE to pick a port. Retrying in 3s...",
+                )
             _serial_restart_event.wait(timeout=3)
             _serial_restart_event.clear()
             continue
-        print(f"[SERIAL] Connecting to {port} at {SERIAL_BAUD} baud…")
+
+        throttled_log(("connect_attempt", port), f"[SERIAL] Connecting to {port} at {SERIAL_BAUD} baud...")
         try:
             with serial.Serial(port, SERIAL_BAUD, timeout=0.25) as ser:
                 ser.reset_input_buffer()
                 _ser_obj = ser
                 _serial_status = {"connected": True, "port": port, "error": None}
                 print(f"[SERIAL] Connected on {port}.")
+                last_log_key = None
                 while True:
                     try:
                         with _serial_io_lock:
@@ -127,8 +185,9 @@ def _serial_reader():
                             _btn_next      = btn_next
                             _btn_reset     = btn_reset
         except Exception as e:
-            _serial_status = {"connected": False, "port": port, "error": str(e)}
-            print(f"[SERIAL] Error on {port}: {e} — retrying in 3s")
+            last_line = _serial_status.get("last_line", "")
+            _serial_status = {"connected": False, "port": port, "error": str(e), "last_line": last_line}
+            throttled_log(("connect_error", port, str(e)), f"[SERIAL] Error on {port}: {e} — retrying in 3s")
             _ser_obj = None
             time.sleep(3)
 
@@ -137,7 +196,9 @@ threading.Thread(target=_serial_reader, daemon=True).start()
 # ─────────────────────────────────────────────────────────────────────────────
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-GENERATION_MODEL = "llama3.2:3b"   # change this to use a different model
+GENERATION_MODEL = "llama3.2"   # change this to use a different model
+APP_HOST = os.environ.get("APP_HOST", "0.0.0.0")
+APP_PORT = int(os.environ.get("APP_PORT", "5002"))
 
 INDEX_PATH  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
 OPTIONS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "paper_trail_options.csv")
@@ -733,10 +794,37 @@ def options_config():
 @app.route("/api/set-port", methods=["POST"])
 def set_port():
     global _user_port_override
-    data = request.get_json()
-    _user_port_override = data.get("port") or None
+    data = request.get_json() or {}
+    requested = (data.get("port") or "").strip()
+    _user_port_override = requested or None
     _serial_restart_event.set()   # wake the reader immediately
     return {"ok": True, "port": _user_port_override}
+
+
+@app.route("/api/disconnect-port", methods=["POST"])
+def disconnect_port():
+    global _user_port_override, _ser_obj, _serial_status
+    _user_port_override = _MANUAL_DISCONNECT_TOKEN
+
+    # Close current serial handle (if any) so the reader loop drops immediately.
+    with _serial_io_lock:
+        ser = _ser_obj
+        _ser_obj = None
+        if ser:
+            try:
+                ser.close()
+            except Exception:
+                pass
+
+    last_line = _serial_status.get("last_line", "")
+    _serial_status = {
+        "connected": False,
+        "port": None,
+        "error": "Disconnected by user. Click NO DEVICE to pick a port.",
+        "last_line": last_line,
+    }
+    _serial_restart_event.set()
+    return {"ok": True}
 
 
 @app.route("/api/save-receipt-png", methods=["POST"])
@@ -906,7 +994,9 @@ def print_receipt():
 
 
 if __name__ == "__main__":
-    print(f"Starting Paper Trail at http://localhost:5002")
+    print(f"Starting Paper Trail on {APP_HOST}:{APP_PORT}")
+    if APP_HOST == "0.0.0.0":
+        print(f"Open locally: http://localhost:{APP_PORT}")
     print(f"Using model: {GENERATION_MODEL}")
     print(f"Ollama expected at: {OLLAMA_URL}")
-    app.run(debug=True, port=5002, use_reloader=False)
+    app.run(host=APP_HOST, debug=True, port=APP_PORT, use_reloader=False)

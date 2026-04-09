@@ -19,7 +19,7 @@ pip install flask requests pyserial
 ollama serve
 
 # 3. Pull the language model (first time only, ~2 GB)
-ollama pull llama3.2:3b
+ollama pull llama3.2
 
 # 4. Start the app
 python app.py
@@ -43,7 +43,7 @@ Download from [ollama.com](https://ollama.com) and install.
 
 ```bash
 # Pull the model (one-time, ~2 GB download)
-ollama pull llama3.2:3b
+ollama pull llama3.2
 
 # Start Ollama (keep this running in a separate terminal)
 ollama serve
@@ -76,16 +76,16 @@ sudo systemctl disable ollama
 A larger model produces richer output. To switch models, edit `GENERATION_MODEL` at the top of `app.py`:
 
 ```python
-GENERATION_MODEL = "llama3.2:3b"   # or: "llama3.2:latest", "qwen2.5:7b"
+GENERATION_MODEL = "llama3.2"   # or: "llama3.2:3b", "qwen2.5:7b"
 ```
 
 ### 3. Arduino
 
-Upload the sketch in this repo to an Arduino Mega:
+Upload the sketch in this repo to your Arduino board (Mega or classic Nano work with this sketch):
 
 1. Open `arduino/paper_trail/paper_trail.ino` in the Arduino IDE.
 2. Ensure `arduino/paper_trail/bitmaps.h` is in the same sketch folder.
-3. Select **Board: Arduino Mega 2560** and the correct serial port.
+3. Select the correct **Board** and serial port in Arduino IDE.
 4. Click **Upload**.
 
 If you modify score dial generation, regenerate the bitmap header first:
@@ -149,7 +149,9 @@ For 4-leg tactile/panel buttons: use one leg from each internally-connected pair
 python app.py
 ```
 
-Open <http://localhost:5002>. The serial status indicator in the top-right corner shows the connection state:
+Open <http://localhost:5002>. On Raspberry Pi, the app binds to all interfaces by default, so you can also open `http://<pi-ip>:5002` from another device on the same network.
+
+The serial status indicator in the top-right corner shows the connection state:
 
 - **Green dot + port name** — Arduino connected and sending data
 - **Red dot + NO DEVICE** — not connected
@@ -162,6 +164,7 @@ The app auto-detects common USB-serial adapters (CH340, CP210x, usbmodem). If au
 2. A panel lists all available serial ports with their descriptions.
 3. Ports that look like Arduino are shown first with a **◆ LIKELY ARDUINO** badge.
 4. Click a port — the app immediately tries to connect.
+5. If the serial link gets stuck, click **DISCONNECT** in the port panel, then select the port again.
 
 If you know the port in advance, you can hardcode it in `app.py`:
 
@@ -191,7 +194,7 @@ Connect the external GND to the Arduino GND as well.
 
 Wire colours vary between batches — check yours. Typically:
 
-| Printer wire        | Arduino Mega pin                |
+| Printer wire        | Arduino pin                     |
 |---------------------|---------------------------------|
 | GND (usually black) | GND                             |
 | TX  (usually green) | Pin 5 (Arduino's RX)            |
@@ -203,29 +206,31 @@ Wire colours vary between batches — check yours. Typically:
 
 Each screen shows two knob panels (top row) and one slider panel (bottom row). All three descriptions update live as you turn the controls.
 
+Option labels and descriptions are loaded from `paper_trail_options.csv`, so the exact wording can change over time without editing frontend code.
+
 ### Screen 1 — Who Are You?
 
 | Control           | Hardware    | Options                                                   |
 |-------------------|-------------|-----------------------------------------------------------|
-| Org Type          | Knob 1 (A0) | NGO / Non-profit, Gov / Public, Private startup, Big Tech |
-| Funding           | Knob 2 (A1) | Govt grants, Subscription, Venture capital, Corp sponsor  |
-| Ethical Framework | Slider (A4) | Open ethics → Harm-tolerant (5 positions)                 |
+| Org Type          | Knob 1 (A0) | Dynamic (from `paper_trail_options.csv`)                 |
+| Funding           | Knob 2 (A1) | Dynamic (from `paper_trail_options.csv`)                 |
+| Ethical Framework | Slider (A4) | Dynamic (from `paper_trail_options.csv`)                 |
 
 ### Screen 2 — Your Data
 
 | Control      | Hardware    | Options                                                         |
 |--------------|-------------|-----------------------------------------------------------------|
-| Data Types   | Knob 1 (A0) | General web, Books / Academic, Proprietary client, Social media |
-| Data Use     | Knob 2 (A1) | Unsupervised, Human feedback, Rule-based, Fine-tuned            |
-| Data Source  | Slider (A4) | Open datasets → Synthetic (5 positions)                         |
+| Data Types   | Knob 1 (A0) | Dynamic (from `paper_trail_options.csv`)                        |
+| Data Use     | Knob 2 (A1) | Dynamic (from `paper_trail_options.csv`)                        |
+| Data Source  | Slider (A4) | Dynamic (from `paper_trail_options.csv`)                        |
 
 ### Screen 3 — Your Model
 
 | Control        | Hardware    | Options                                                                 |
 |----------------|-------------|-------------------------------------------------------------------------|
-| Model Location | Knob 1 (A0) | Cloud, On-premise, Edge device, Decentralised                           |
-| System Prompt  | Knob 2 (A1) | Open / transparent, Lightly guided, Commercially optimised, Restricted  |
-| Model Size     | Slider (A4) | 1B → 140B (5 positions)                                                 |
+| Model Location | Knob 1 (A0) | Dynamic (from `paper_trail_options.csv`)                                |
+| System Prompt  | Knob 2 (A1) | Dynamic (from `paper_trail_options.csv`)                                |
+| Model Size     | Slider (A4) | Dynamic (from `paper_trail_options.csv`)                                |
 
 Press **GENERATE** on screen 3 to produce the receipt.
 
@@ -243,22 +248,29 @@ After generation, the output shows:
 
 - A blank **Company Name** field (write on the printed receipt)
 - Your full spec summary (org type, ethics, funding, data, model)
-- Three ratings — **Environmental**, **Social**, **Practicality/Sustainability** (0–10, from CSV config)
-- A 10–12 word summary beneath each score explaining it
+- Three deterministic scores — **Environmental Impact**, **Social Impact**, **Practicality** (1–10)
+- Up to 4 deterministic rule-trigger reasons per score (prefixed with `>`)
 - A 2-sentence **speculative narrative** about the organisation's arc
+- A 1-sentence **failure note** highlighting the likely contradiction or failure point
 - A blank **Your Response** field (write your reaction on the printed receipt)
 - A sequential receipt ID (shown on both digital and physical receipt)
 
 Each generated receipt is auto-printed once and auto-saved as a PNG in `receipt_pngs/`.  
 Use **PRINT** to create an extra copy.
 
-### Tuning copy + scores
+### Tuning copy + scoring
 
-Open `paper_trail_options.csv` to edit the interaction option labels/descriptions and all three rating values.  
-This is the canonical file used by the app for both interface copy and scoring.
+Edit `paper_trail_options.csv` to update option labels/descriptions used by the interface.
 
-- Ratings are integers **0–10** (`0 = bad`, `10 = good`).
-- `scores.csv` is kept as a compatibility export for tooling that still expects the old format.
+Deterministic scoring is rule-based in `app.py`:
+
+- `ENV_BASE` + `ENV_COMBOS`
+- `SOCIAL_BASE` + `SOCIAL_COMBOS`
+- `PRACTICALITY_BASE` + `PRACTICALITY_COMBOS`
+
+Scores start at 5, modifiers stack from matching rules, then clamp to **1–10**.
+
+`scores.csv` remains as a legacy compatibility export and is not used by runtime scoring.
 
 ---
 
@@ -277,7 +289,7 @@ Close the Arduino IDE's Serial Monitor before running `python app.py`.
 Make sure `use_reloader=False` is set in `app.py` (already the default). Flask's debug reloader forks the process, starting two serial threads.
 
 **Wrong model size / slow generation**
-Edit `GENERATION_MODEL` in `app.py`. `llama3.2:3b` is fast; `qwen2.5:7b` produces better writing.
+Edit `GENERATION_MODEL` in `app.py`. `llama3.2` is fast; `qwen2.5:7b` produces better writing.
 
 ---
 
@@ -285,7 +297,7 @@ Edit `GENERATION_MODEL` in `app.py`. `llama3.2:3b` is fast; `qwen2.5:7b` produce
 
 | File         | Purpose                                                                                                                                  |
 |--------------|------------------------------------------------------------------------------------------------------------------------------------------|
-| `app.py`     | Flask backend — serial reader (knobs, slider, and nav button states), `/api/knob`, `/api/serial-status`, `/api/list-ports`, `/api/set-port`, `/api/generate`, `/api/print`, `/api/save-receipt-png`, receipt ID generation, CSV score loader |
-| `paper_trail_options.csv` | Canonical control data + option copy + env/social/practicality ratings (editable)                                         |
-| `scores.csv` | Compatibility score export (`control, option_index, option_label, env_score, social_score, practicality_score`)                           |
+| `app.py`     | Flask backend — serial reader (knobs, slider, nav buttons), `/api/knob`, `/api/serial-status`, `/api/list-ports`, `/api/set-port`, `/api/disconnect-port`, `/api/options`, `/api/generate`, `/api/print`, `/api/save-receipt-png`, receipt ID generation, deterministic scoring engine |
+| `paper_trail_options.csv` | Canonical control option copy (labels/descriptions) used by frontend/backend                                         |
+| `scores.csv` | Legacy compatibility score export (`control, option_index, option_label, env_score, social_score, practicality_score`)                    |
 | `index.html` | Complete single-file frontend — HTML, CSS, and JS inline, no build step                                                                  |

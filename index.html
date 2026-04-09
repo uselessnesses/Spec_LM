@@ -585,7 +585,13 @@ html, body {
   margin-top: 4px;
 }
 #port-modal-note { font-size: 10px; color: var(--dim); letter-spacing: 0.5px; }
-#port-modal-close {
+#port-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#port-modal-close,
+#port-disconnect {
   font-family: var(--font);
   font-size: 11px;
   letter-spacing: 2px;
@@ -597,6 +603,14 @@ html, body {
   transition: border-color 0.15s, color 0.15s;
 }
 #port-modal-close:hover { border-color: var(--accent); color: var(--text); }
+#port-disconnect {
+  border-color: #4a2424;
+  color: #d08a8a;
+}
+#port-disconnect:hover {
+  border-color: var(--red);
+  color: #f0b0b0;
+}
 
 #debug-overlay {
   position: fixed;
@@ -2010,6 +2024,13 @@ function closePortPicker() {
   document.getElementById('port-modal').classList.remove('active');
 }
 
+async function disconnectPort() {
+  try {
+    await fetch('/api/disconnect-port', { method: 'POST' });
+  } catch (_) {}
+  closePortPicker();
+}
+
 let _serialStatusTimer = null;
 function startSerialStatusPoll() {
   clearInterval(_serialStatusTimer);
@@ -2112,6 +2133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('serial-indicator').addEventListener('click', openPortPicker);
   document.getElementById('port-modal-close').addEventListener('click', closePortPicker);
+  document.getElementById('port-disconnect').addEventListener('click', disconnectPort);
   document.getElementById('port-modal').addEventListener('click', (e) => {
     if (e.target === document.getElementById('port-modal')) closePortPicker();
   });
@@ -2212,7 +2234,10 @@ async function autoSaveAndPrintReceipt() {
     <div id="port-list"><div id="port-list-empty">SCANNING…</div></div>
     <div id="port-modal-footer">
       <span id="port-modal-note">Click a port to connect. Arduino-likely ports shown first.</span>
-      <button id="port-modal-close">CANCEL</button>
+      <div id="port-modal-actions">
+        <button id="port-disconnect">DISCONNECT</button>
+        <button id="port-modal-close">CANCEL</button>
+      </div>
     </div>
   </div>
 </div>
