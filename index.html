@@ -1660,8 +1660,8 @@ async function generateFinal() {
       }
       // Show story in overlay as it streams
       const rest = buf.replace(/^__(?:SCORES|SCORE_DATA|RECEIPT_ID)__:[^\n]*\n/gm, '');
-      const m = rest.match(/STORY:\s*([\s\S]*?)(?=\n+FAILURE_NOTE:|$)/i);
-      if (m) storyEl.textContent = m[1].trim();
+      const m = rest.match(/STORY:\s*([\s\S]*)/i);
+      if (m) storyEl.textContent = sanitizeStoryText(m[1], { allowFallback: false });
     });
 
     const parsed = parseFinal(fullBuf);
@@ -1673,7 +1673,6 @@ async function generateFinal() {
     overlay.classList.remove('active');
     renderReceipt({
       story: 'Could not reach Ollama. Is it running?',
-      failureNote: '',
       envReasons: state.envReasons || [],
       socialReasons: state.socialReasons || [],
       pracReasons: state.pracReasons || [],
@@ -1689,6 +1688,154 @@ async function generateFinal() {
 /* ============================================================
    PARSE HELPERS
    ============================================================ */
+function normalizeSpaces(text) {
+  return String(text || '').replace(/\s+/g, ' ').trim();
+}
+
+function truncateWords(text, maxWords) {
+  const clean = normalizeSpaces(text);
+  if (!clean) return '';
+  const words = clean.split(' ');
+  if (words.length <= maxWords) return clean;
+  return words.slice(0, maxWords).join(' ');
+}
+
+function wordCount(text) {
+  const clean = normalizeSpaces(text);
+  return clean ? clean.split(' ').length : 0;
+}
+
+function storyLooksLikeNamedOrg(text) {
+  if (/\b(named|called|known as|branded as|titled)\b/i.test(text)) return true;
+  if (/[\"“”'‘’][^\"“”'‘’]{2,36}[\"“”'‘’]/.test(text)) return true;
+  return false;
+}
+
+function storyLooksFlowery(text) {
+  return /\b(visionary|transformative|revolutionary|groundbreaking|utopian|inspiring|remarkable|extraordinary)\b/i.test(text);
+}
+
+function storyMentionsScoreTension(text) {
+  return /\b(environment|social|practical|fund|grant|loan|subscription|data|model|compute|cost|feasib|viab|sustain|risk|impact)\w*\b/i.test(text);
+}
+
+function storyMentionsLifespan(text) {
+  return /\b(\d+\s*-\s*\d+\s*years?|\d+\+?\s*years?|under\s+\d+\s*years?|within\s+\d+\s*years?|months?)\b/i.test(text);
+}
+
+function storyHasCausalLink(text) {
+  return /\b(because|due to|driven by|caused by|as|after|from)\b/i.test(text);
+}
+
+function storyTooScoreFocused(text) {
+  return /\b\d+\s*\/\s*10\b|\b(low|high)\s+(environmental impact|social impact|practicality)\b/i.test(text);
+}
+
+const LOW_SOCIAL_HARM_THRESHOLD = 3;
+
+function storyMentionsHarm(text) {
+  return /\b(harm|harmed|harms|exploit|exploitation|abuse|abusive|injury|injuries|surveillance|discrimination|unsafe|misuse|consent breach|privacy)\b/i.test(text);
+}
+
+function harmPhraseFromReasons(reasons) {
+  const blob = (Array.isArray(reasons) ? reasons : []).join(' ').toLowerCase();
+  if (/(consent|scrap|social media|personal expression|without their knowledge)/.test(blob)) return 'non-consensual data use';
+  if (/(crowd|underpay|labour|extractive)/.test(blob)) return 'exploitative labour practices';
+  if (/(weapon|guardrail|safety)/.test(blob)) return 'unsafe outputs enabling misuse';
+  if (/(public body|citizens|community|trust)/.test(blob)) return 'loss of trust in essential services';
+  if (/(surveillance|privacy)/.test(blob)) return 'surveillance and privacy abuse';
+  return 'people being harmed through unfair deployment';
+}
+
+function estimateLifespanPhrase(envScore, socialScore, pracScore) {
+  const viability = (0.5 * Number(pracScore || 5)) + (0.3 * Number(socialScore || 5)) + (0.2 * Number(envScore || 5));
+  if (viability <= 2.5) return 'under 1 year';
+  if (viability <= 3.5) return '1-2 years';
+  if (viability <= 4.5) return '2-3 years';
+  if (viability <= 6.0) return '3-5 years';
+  if (viability <= 7.5) return '5-8 years';
+  if (viability <= 9.0) return '8-12 years';
+  if (viability <= 9.4) return '12-20 years';
+  return '45 years';
+}
+
+function buildObjectiveStoryFallback() {
+  const dims = [
+    { key: 'environmental', score: Number(state.envScore) || 5, reasons: state.envReasons || [] },
+    { key: 'social', score: Number(state.socialScore) || 5, reasons: state.socialReasons || [] },
+    { key: 'practicality', score: Number(state.pracScore) || 5, reasons: state.pracReasons || [] },
+  ];
+  const worst = [...dims].sort((a, b) => a.score - b.score)[0];
+  const ordered = [worst, ...dims.filter((d) => d.key !== worst.key)];
+  let reason = '';
+  const lowSocial = Number(state.socialScore || 5) <= LOW_SOCIAL_HARM_THRESHOLD;
+  const snippetWords = lowSocial ? 7 : 9;
+  for (const d of ordered) {
+    if (d.reasons && d.reasons.length) {
+      const clause = String(d.reasons[0]).split(/[.!?]/)[0];
+      reason = truncateWords(clause, snippetWords).replace(/[ ,;:-]+$/, '');
+      if (reason) {
+        reason = reason.charAt(0).toLowerCase() + reason.slice(1);
+        break;
+      }
+    }
+  }
+
+  const lifespan = estimateLifespanPhrase(state.envScore, state.socialScore, state.pracScore);
+  const harm = harmPhraseFromReasons([...(state.socialReasons || []), ...(state.envReasons || []), ...(state.pracReasons || [])]);
+  let text = '';
+  if (lowSocial && reason) {
+    text = `Expected lifespan is ${lifespan} because ${reason}; harm included ${harm}.`;
+  } else if (lowSocial) {
+    text = `Expected lifespan is ${lifespan} because social safeguards failed; harm included ${harm}.`;
+  } else if (lifespan === '45 years') {
+    if (reason) text = `The organisation was still going after 45 years due to ${reason}.`;
+    else text = 'The organisation was still going after 45 years due to resilient funding, manageable operating costs, and sustained public trust.';
+  } else if (reason && worst.key === 'practicality') {
+    text = `Likely lifespan is ${lifespan} because ${reason}.`;
+  } else if (reason && worst.key === 'social') {
+    text = `Expected lifespan is ${lifespan} because ${reason}.`;
+  } else if (reason) {
+    text = `Estimated lifespan is ${lifespan} because ${reason}.`;
+  } else if (worst.key === 'practicality') {
+    text = `Likely lifespan is ${lifespan} because delivery and operating costs are hard to sustain.`;
+  } else if (worst.key === 'social') {
+    text = `Expected lifespan is ${lifespan} because trust and consent issues reduce adoption.`;
+  } else {
+    text = `Estimated lifespan is ${lifespan} because energy and resource demands compound over time.`;
+  }
+
+  if (wordCount(text) > 30) text = truncateWords(text, 30).replace(/[ ,;:-]+$/, '');
+  if (!/[.!?]$/.test(text)) text += '.';
+  return text;
+}
+
+function sanitizeStoryText(rawStory, { allowFallback = true } = {}) {
+  let text = normalizeSpaces(rawStory);
+  text = text.replace(/^\s*STORY:\s*/i, '');
+  text = text.replace(/[ ,;:-]+$/, '');
+
+  const invalid =
+    !text ||
+    wordCount(text) > 30 ||
+    ((text.match(/[.!?]/g) || []).length > 1) ||
+    storyLooksLikeNamedOrg(text) ||
+    storyLooksFlowery(text) ||
+    storyTooScoreFocused(text) ||
+    !storyMentionsLifespan(text) ||
+    !storyHasCausalLink(text) ||
+    !storyMentionsScoreTension(text) ||
+    ((Number(state.socialScore || 5) <= LOW_SOCIAL_HARM_THRESHOLD) && !storyMentionsHarm(text));
+
+  if (invalid) {
+    if (!allowFallback) return text;
+    return buildObjectiveStoryFallback();
+  }
+
+  if (!/[.!?]$/.test(text)) text += '.';
+  return text;
+}
+
 function parseFinal(text) {
   const rid = ((text.match(/^__RECEIPT_ID__:(.+)$/m) || [])[1] || state.receiptId || '').trim();
   const scoreMatch = text.match(/^__SCORE_DATA__:(.+)$/m);
@@ -1708,14 +1855,11 @@ function parseFinal(text) {
   }
 
   const clean = text.replace(/^__(?:SCORES|SCORE_DATA|RECEIPT_ID)__:[^\n]*\n/gm, '');
-  const story = (clean.match(
-    /STORY:\s*([\s\S]*?)(?=\n+FAILURE_NOTE:|$)/i
-  ) || clean.match(/STORY:\s*([\s\S]*)/i) || [])[1] || '';
-  const failureNote = (clean.match(/FAILURE_NOTE:\s*([^\n]+)/i) || [])[1] || '';
+  const storyRaw = (clean.match(/STORY:\s*([\s\S]*)/i) || [])[1] || '';
+  const story = sanitizeStoryText(storyRaw, { allowFallback: true });
 
   return {
     story:               story.trim(),
-    failureNote:         failureNote.trim(),
     envReasons:          state.envReasons || [],
     socialReasons:       state.socialReasons || [],
     pracReasons:         state.pracReasons || [],
@@ -1838,11 +1982,6 @@ function renderReceipt(data) {
 
     <div class="r-label" style="margin-bottom:6px;">COMPANY STORY</div>
     <div class="r-story">${data.story || '—'}</div>
-
-    <hr class="r-divider">
-
-    <div class="r-label" style="margin-bottom:6px;">LIKELY FAILURE POINT</div>
-    <div class="r-story">${data.failureNote || '—'}</div>
 
     <hr class="r-divider">
 
@@ -2171,8 +2310,7 @@ async function printReceipt() {
       env_reasons:           _receiptData.envReasons           || [],
       social_reasons:        _receiptData.socialReasons        || [],
       prac_reasons:          _receiptData.pracReasons          || [],
-      story:                 _receiptData.story                || '',
-      failure_note:          _receiptData.failureNote          || '',
+      story:                 sanitizeStoryText(_receiptData.story || '', { allowFallback: true }),
       receipt_id:            _receiptData.receiptId            || state.receiptId || '',
     };
     const r = await fetch('/api/print', {

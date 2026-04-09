@@ -727,8 +727,8 @@ def generate():
     receipt_id = _next_receipt_id()
 
     prompt = (
-        "You are a speculative fiction analyst. Based on these AI organisation design choices, "
-        "write a brief critical analysis.\n\n"
+        "You are an objective AI risk analyst. Based on these organisation design choices, "
+        "write a concise, factual output that gives an overview of the risks, practical considerations and how long the organisation might last and why. Use simple language.\n\n"
         f"ORG TYPE: {org_type}\n"
         f"ETHICAL FRAMEWORK: {ethical}\n"
         f"FUNDING: {funding}\n"
@@ -747,11 +747,15 @@ def generate():
         f"{reasons_block(prac_reasons)}\n\n"
         "Respond in EXACTLY this format:\n\n"
         "STORY:\n"
-        "[2 sentences maximum. Speculative narrative of this organisation's arc - its peak and most likely end. "
-        "Reference the deterministic tensions above. Be specific to the choices made. "
-        "Be matter-of-fact, not preachy.]\n\n"
-        "FAILURE_NOTE:\n"
-        "[1 sentence naming the most likely failure point or contradiction.]"
+        "[Maximum 30 words. One sentence. Objective and specific. "
+        "Include a lifespan estimate in years and a clear cause from the choices above. "
+        "Examples of acceptable framing: 'Likely lifespan: 2-3 years, because ...' or "
+        "'The organisation was still going after 45 years due to ...'. "
+        "Reference concrete tensions/reasons indirectly; do not quote full reasons. "
+        "If SOCIAL IMPACT is 3/10 or lower, explicitly include one concrete harm that was caused. "
+        "Do not mention numeric score values or phrases like 'low social impact'. "
+        "Never invent or mention any company/organisation name, title, or brand. "
+        "Avoid flowery language.]"
     )
 
     def gen_with_scores():
@@ -765,7 +769,7 @@ def generate():
         yield f"__SCORES__:{env_score},{social_score},{prac_score}\n"
         yield f"__SCORE_DATA__:{score_payload_json}\n"
         yield f"__RECEIPT_ID__:{receipt_id}\n"
-        yield from stream_ollama(prompt, num_predict=450, temperature=0.7)
+        yield from stream_ollama(prompt, num_predict=160, temperature=0.4)
 
     return streamed(gen_with_scores())
 
@@ -851,6 +855,215 @@ def save_receipt_png():
         return {"ok": False, "error": str(e)}, 500
 
 
+def _normalize_spaces(text):
+    return re.sub(r"\s+", " ", str(text or "")).strip()
+
+
+STORY_MAX_WORDS = 30
+LOW_SOCIAL_HARM_THRESHOLD = 3
+
+
+def _truncate_words(text, max_words):
+    clean = _normalize_spaces(text)
+    if not clean:
+        return ""
+    words = clean.split(" ")
+    if len(words) <= max_words:
+        return clean
+    return " ".join(words[:max_words])
+
+
+def _word_count(text):
+    clean = _normalize_spaces(text)
+    return len(clean.split(" ")) if clean else 0
+
+
+def _story_looks_like_named_org(text):
+    if re.search(r"\b(named|called|known as|branded as|titled)\b", text, flags=re.IGNORECASE):
+        return True
+    if re.search(r"[\"“”'‘’][^\"“”'‘’]{2,40}[\"“”'‘’]", text):
+        return True
+    return False
+
+
+def _story_looks_flowery(text):
+    return re.search(
+        r"\b(visionary|transformative|revolutionary|groundbreaking|utopian|inspiring|remarkable|extraordinary)\b",
+        text,
+        flags=re.IGNORECASE,
+    ) is not None
+
+
+def _story_mentions_score_tension(text):
+    return re.search(
+        r"\b(environment|social|practical|fund|grant|loan|subscription|data|model|compute|cost|feasib|viab|sustain|risk|impact)\w*\b",
+        text,
+        flags=re.IGNORECASE,
+    ) is not None
+
+
+def _story_mentions_lifespan(text):
+    return re.search(
+        r"\b(\d+\s*-\s*\d+\s*years?|\d+\+?\s*years?|under\s+\d+\s*years?|within\s+\d+\s*years?|months?)\b",
+        text,
+        flags=re.IGNORECASE,
+    ) is not None
+
+
+def _story_has_causal_link(text):
+    return re.search(
+        r"\b(because|due to|driven by|caused by|as|after|from)\b",
+        text,
+        flags=re.IGNORECASE,
+    ) is not None
+
+
+def _story_too_score_focused(text):
+    return re.search(
+        r"\b\d+\s*\/\s*10\b|\b(low|high)\s+(environmental impact|social impact|practicality)\b",
+        text,
+        flags=re.IGNORECASE,
+    ) is not None
+
+
+def _story_mentions_harm(text):
+    return re.search(
+        r"\b(harm|harmed|harms|exploit|exploitation|abuse|abusive|injury|injuries|surveillance|discrimination|unsafe|misuse|consent breach|privacy)\b",
+        text,
+        flags=re.IGNORECASE,
+    ) is not None
+
+
+def _reason_snippet(reasons, max_words=10):
+    if not isinstance(reasons, list):
+        return ""
+    for reason in reasons:
+        if not reason:
+            continue
+        first_clause = re.split(r"[.!?]", str(reason), maxsplit=1)[0]
+        snippet = _truncate_words(first_clause, max_words).rstrip(" ,;:-")
+        if snippet:
+            return snippet[0].lower() + snippet[1:] if len(snippet) > 1 else snippet.lower()
+    return ""
+
+
+def _harm_phrase_from_reasons(reasons):
+    blob = " ".join(str(r).lower() for r in (reasons or []) if r)
+    if re.search(r"consent|scrap|social media|personal expression|without their knowledge", blob):
+        return "non-consensual data use"
+    if re.search(r"crowd|underpay|labour|extractive", blob):
+        return "exploitative labour practices"
+    if re.search(r"weapon|guardrail|safety", blob):
+        return "unsafe outputs enabling misuse"
+    if re.search(r"public body|citizens|community|trust", blob):
+        return "loss of trust in essential services"
+    if re.search(r"surveillance|privacy", blob):
+        return "surveillance and privacy abuse"
+    return "people being harmed through unfair deployment"
+
+
+def _estimate_lifespan_phrase(env_score, social_score, prac_score):
+    viability = (0.5 * float(prac_score)) + (0.3 * float(social_score)) + (0.2 * float(env_score))
+    if viability <= 2.5:
+        return "under 1 year"
+    if viability <= 3.5:
+        return "1-2 years"
+    if viability <= 4.5:
+        return "2-3 years"
+    if viability <= 6.0:
+        return "3-5 years"
+    if viability <= 7.5:
+        return "5-8 years"
+    if viability <= 9.0:
+        return "8-12 years"
+    if viability <= 9.4:
+        return "12-20 years"
+    return "45 years"
+
+
+def _fallback_story_from_scores(data):
+    env = int(data.get("env_score", 5))
+    social = int(data.get("social_score", 5))
+    prac = int(data.get("prac_score", 5))
+    dims = [
+        ("environmental", env, data.get("env_reasons", [])),
+        ("social", social, data.get("social_reasons", [])),
+        ("practicality", prac, data.get("prac_reasons", [])),
+    ]
+    worst_key, _, _ = min(dims, key=lambda x: x[1])
+    lifespan = _estimate_lifespan_phrase(env, social, prac)
+
+    snippet = ""
+    snippet_words = 7 if social <= LOW_SOCIAL_HARM_THRESHOLD else 9
+    ordered_reasons = [reasons for key, _, reasons in dims if key == worst_key] + [reasons for key, _, reasons in dims if key != worst_key]
+    for reasons in ordered_reasons:
+        snippet = _reason_snippet(reasons, max_words=snippet_words)
+        if snippet:
+            break
+
+    low_social = social <= LOW_SOCIAL_HARM_THRESHOLD
+    harm_phrase = _harm_phrase_from_reasons(
+        (data.get("social_reasons", []) or [])
+        + (data.get("env_reasons", []) or [])
+        + (data.get("prac_reasons", []) or [])
+    )
+
+    if low_social and snippet:
+        sentence = f"Expected lifespan is {lifespan} because {snippet}; harm included {harm_phrase}."
+    elif low_social:
+        sentence = f"Expected lifespan is {lifespan} because social safeguards failed; harm included {harm_phrase}."
+    elif lifespan == "45 years":
+        if snippet:
+            sentence = f"The organisation was still going after 45 years due to {snippet}."
+        else:
+            sentence = "The organisation was still going after 45 years due to resilient funding, manageable operating costs, and sustained public trust."
+    elif snippet and worst_key == "practicality":
+        sentence = f"Likely lifespan is {lifespan} because {snippet}."
+    elif snippet and worst_key == "social":
+        sentence = f"Expected lifespan is {lifespan} because {snippet}."
+    elif snippet:
+        sentence = f"Estimated lifespan is {lifespan} because {snippet}."
+    elif worst_key == "practicality":
+        sentence = f"Likely lifespan is {lifespan} because delivery and operating costs are hard to sustain."
+    elif worst_key == "social":
+        sentence = f"Expected lifespan is {lifespan} because trust and consent issues reduce adoption."
+    else:
+        sentence = f"Estimated lifespan is {lifespan} because energy and resource demands compound over time."
+
+    if _word_count(sentence) > STORY_MAX_WORDS:
+        sentence = _truncate_words(sentence, STORY_MAX_WORDS).rstrip(" ,;:-")
+    if not sentence.endswith((".", "!", "?")):
+        sentence += "."
+    return sentence
+
+
+def _sanitize_story_for_receipt(story_text, data):
+    clean = _normalize_spaces(story_text)
+    clean = re.sub(r"^\s*story\s*:\s*", "", clean, flags=re.IGNORECASE)
+    clean = clean.rstrip(" ,;:-")
+    low_social = int(data.get("social_score", 5)) <= LOW_SOCIAL_HARM_THRESHOLD
+
+    if clean and (
+        _word_count(clean) > STORY_MAX_WORDS
+        or clean.count(".") + clean.count("!") + clean.count("?") > 1
+        or _story_looks_like_named_org(clean)
+        or _story_looks_flowery(clean)
+        or _story_too_score_focused(clean)
+        or not _story_mentions_lifespan(clean)
+        or not _story_has_causal_link(clean)
+        or not _story_mentions_score_tension(clean)
+        or (low_social and not _story_mentions_harm(clean))
+    ):
+        clean = ""
+
+    if not clean:
+        clean = _fallback_story_from_scores(data)
+
+    if not clean.endswith((".", "!", "?")):
+        clean += "."
+    return clean
+
+
 def _build_print_commands(data):
     """Return ordered list of Arduino print command strings for one receipt."""
     WRAP = 32   # characters per line at small font
@@ -913,14 +1126,9 @@ def _build_print_commands(data):
         cmds.append(DASH_LINE)
 
     # ── Story ─────────────────────────────────────────────────────────────────
+    story_text = _sanitize_story_for_receipt(data.get("story", ""), data)
     cmds += ["BOLD_ON", "TEXT:COMPANY STORY", "BOLD_OFF", DASH_LINE]
-    for line in wrap(data.get("story", "")):
-        cmds.append(f"TEXT:{line}")
-    cmds.append(DASH_LINE)
-
-    # ── Failure note ───────────────────────────────────────────────────────────
-    cmds += ["BOLD_ON", "TEXT:LIKELY FAILURE POINT", "BOLD_OFF", DASH_LINE]
-    for line in wrap(data.get("failure_note", "")):
+    for line in wrap(story_text):
         cmds.append(f"TEXT:{line}")
     cmds.append(DASH_LINE)
 

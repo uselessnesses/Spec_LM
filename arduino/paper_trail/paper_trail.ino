@@ -1,6 +1,6 @@
 /*
  * paper_trail.ino
- * VERSION: 009 (2026-04-08)
+ * VERSION: 010 (2026-04-09)
  * ---------------------------------------------------------
  * Paper Trail — Arduino Mega sketch
  *
@@ -68,11 +68,11 @@ const uint8_t BTN_RESET_PIN = 7;
 unsigned long lastSensorSend = 0;
 const unsigned long SENSOR_INTERVAL_MS = 50;
 
-// Score bitmap scaling: keep source bitmaps at 128x128 in flash, print 2x in both
-// directions (256x256) while using a small strip buffer in SRAM for speed.
+// Score bitmap scaling: keep source bitmaps at 128x128 in flash.
+// Use DIAL_SCALE=1 for faster, lighter prints; DIAL_SCALE=2 for larger dials.
 const uint16_t DIAL_SRC_W = DIAL_SIZE;
 const uint16_t DIAL_SRC_H = DIAL_SIZE;
-const uint8_t  DIAL_SCALE = 2;
+const uint8_t  DIAL_SCALE = 1;
 const uint16_t DIAL_PRINT_W = DIAL_SRC_W * DIAL_SCALE;
 const uint16_t DIAL_PRINT_H = DIAL_SRC_H * DIAL_SCALE;
 const uint16_t DIAL_ROW_BYTES_SRC = (DIAL_SRC_W + 7) / 8;
@@ -143,7 +143,14 @@ void expandSourceRow2x(const uint8_t* bmp, uint16_t ySrc, uint8_t* dstRow) {
   }
 }
 
-void printScoreScaled2x(const uint8_t* bmp) {
+void copySourceRow1x(const uint8_t* bmp, uint16_t ySrc, uint8_t* dstRow) {
+  const uint16_t srcBase = ySrc * DIAL_ROW_BYTES_SRC;
+  for (uint16_t bx = 0; bx < DIAL_ROW_BYTES_SRC; bx++) {
+    dstRow[bx] = pgm_read_byte(bmp + srcBase + bx);
+  }
+}
+
+void printScoreScaled(const uint8_t* bmp) {
   // Center the dial and print in strips for much lower command overhead.
   printer.justify('C');
 
@@ -155,7 +162,8 @@ void printScoreScaled2x(const uint8_t* bmp) {
       const uint16_t yOut = yOutStart + r;
       const uint16_t ySrc = yOut / DIAL_SCALE;
       uint8_t* dstRow = &scoreScaledStripBuf[r * DIAL_ROW_BYTES_DST];
-      expandSourceRow2x(bmp, ySrc, dstRow);
+      if (DIAL_SCALE == 1) copySourceRow1x(bmp, ySrc, dstRow);
+      else                 expandSourceRow2x(bmp, ySrc, dstRow);
     }
 
     printer.printBitmap(DIAL_PRINT_W, rowsThisStrip, scoreScaledStripBuf, false);
@@ -266,7 +274,7 @@ void handleCommand(const String& cmd) {
     int s = cmd.substring(6).toInt();
     if (s >= 1 && s <= 10) {
       const uint8_t* bmp = (const uint8_t*)pgm_read_ptr(&score_bitmaps[s - 1]);
-      printScoreScaled2x(bmp);
+      printScoreScaled(bmp);
     }
   }
 }
