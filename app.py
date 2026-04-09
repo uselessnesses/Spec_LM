@@ -154,6 +154,8 @@ def _serial_reader():
                         with _serial_io_lock:
                             line = ser.readline().decode("utf-8", errors="ignore").strip()
                     except OSError:
+                        if not ser.is_open:
+                            break  # port was closed externally; exit inner loop
                         continue  # transient USB-serial artefact
                     if line:
                         _serial_status["last_line"] = line

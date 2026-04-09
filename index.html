@@ -2016,7 +2016,7 @@ async function openPortPicker() {
       list.appendChild(row);
     }
   } catch (e) {
-    list.innerHTML = '<div id="port-list-empty">ERROR LOADING PORTS</div>';
+    list.innerHTML = '<div id="port-list-empty">ERROR LOADING PORTS<br><button onclick="openPortPicker()" style="margin-top:10px;font-family:var(--font);font-size:11px;letter-spacing:2px;background:transparent;border:1px solid var(--border2);color:var(--dim);padding:6px 14px;cursor:pointer;">TRY AGAIN</button></div>';
   }
 }
 
