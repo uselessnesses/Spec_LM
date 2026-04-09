@@ -438,23 +438,18 @@ SOCIAL_COMBOS = [
     },
     {
         "conditions": {"data_type": "Client / task specific", "data_source": "Scraped"},
-        "modifier": -3,
+        "modifier": -5,
         "reason": "Scraping client-specific data without consent is a serious breach of trust.",
     },
     {
         "conditions": {"org_type": "Community group", "data_source": "Scraped"},
-        "modifier": -3,
+        "modifier": -5,
         "reason": "A community organisation scraping data contradicts the trust-based relationship it depends on.",
     },
     {
         "conditions": {"data_type": "Social media", "data_source": "Scraped"},
         "modifier": -2,
         "reason": "Scraping social media content means using people's personal expression without their knowledge or consent.",
-    },
-    {
-        "conditions": {"data_type": "Social media", "ethical": "Justice and rights centred"},
-        "modifier": -1,
-        "reason": "Using social media data, even ethically, is hard to square with a rights-centred approach when users did not consent to this use.",
     },
     {
         "conditions": {"data_source": "Built / collected in-house", "ethical": "Justice and rights centred"},
@@ -564,7 +559,7 @@ PRACTICALITY_COMBOS = [
     {
         "conditions": {"model_size": "80B", "model_location": "Runs on devices locally"},
         "modifier": -10,
-        "reason": "An 80 billion parameter model requires dedicated server hardware. It will not run on a phone or laptop.",
+        "reason": "An 80 billion parameter model requires specialised hardware. It will not run on a normal phone or laptop.",
     },
     {
         "conditions": {"model_size": "14B", "model_location": "Runs on devices locally"},
@@ -585,11 +580,6 @@ PRACTICALITY_COMBOS = [
         "conditions": {"model_size": "14B", "model_location": "Hosted by the organisation"},
         "modifier": 1,
         "reason": "A 14B model hosted by the organisation is demanding but usually workable with modest server hardware.",
-    },
-    {
-        "conditions": {"model_size": "80B", "model_location": "Hosted by the organisation"},
-        "modifier": -4,
-        "reason": "An 80B model needs expensive hardware and ongoing operations that many teams cannot sustain.",
     },
     {
         "conditions": {"model_size": "140B", "model_location": "Hosted by the organisation"},
@@ -652,11 +642,6 @@ PRACTICALITY_COMBOS = [
         "reason": "A community group cannot afford the infrastructure to train or run a frontier-scale model. The compute costs alone would consume the entire budget.",
     },
     {
-        "conditions": {"org_type": "Community group", "model_size": "80B"},
-        "modifier": -5,
-        "reason": "Running an 80B model requires significant ongoing server costs that most community groups cannot sustain.",
-    },
-    {
         "conditions": {"org_type": "Research institute", "model_size": "140B"},
         "modifier": -4,
         "reason": "Only a handful of the best-funded research labs in the world can train models at this scale.",
@@ -675,11 +660,6 @@ PRACTICALITY_COMBOS = [
         "conditions": {"funding": "Government grants", "model_size": "140B"},
         "modifier": -4,
         "reason": "Government research grants rarely cover the hundreds of millions needed for frontier model training.",
-    },
-    {
-        "conditions": {"funding": "Government grants", "model_size": "80B"},
-        "modifier": -2,
-        "reason": "Government grants can fund large model research, but the funding cycles are slow and competitive.",
     },
     {
         "conditions": {"funding": "Big loan", "ethical": "Transparent and careful"},
@@ -1338,8 +1318,6 @@ def _build_print_commands(data):
                 for i, line in enumerate(reason_lines):
                     prefix = "> " if i == 0 else "  "
                     cmds.append(f"TEXT:{prefix}{line}")
-        else:
-            cmds.append("TEXT:> No major combination rules triggered.")
         cmds.append("FEED:1")
         cmds.append(DASH_LINE)
 

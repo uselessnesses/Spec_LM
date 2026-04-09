@@ -1920,7 +1920,7 @@ function escapeHtml(s) {
 function makeReasonLines(reasons) {
   const list = Array.isArray(reasons) ? reasons.slice(0, 3) : [];
   if (!list.length) {
-    return '<div class="r-score-reason">&gt; No major combination rules triggered.</div>';
+    return '';
   }
   return list.map((reason) => (
     `<div class="r-score-reason">&gt; ${escapeHtml(reason)}</div>`
