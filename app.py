@@ -204,7 +204,7 @@ APP_PORT = int(os.environ.get("APP_PORT", "5002"))
 
 INDEX_PATH  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
 OPTIONS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "paper_trail_options.csv")
-RECEIPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "receipt_pngs")
+RECEIPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "receipt_pngs/CHI_Study")
 RECEIPT_COUNTER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "receipt_counter.txt")
 _receipt_id_lock = threading.Lock()
 
