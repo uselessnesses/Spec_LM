@@ -674,7 +674,7 @@ html, body {
           <div class="ctrl-desc" id="s0k1-desc"></div>
         </div>
         <div class="ctrl-panel knob-panel">
-          <div class="ctrl-label">FUNDING</div>
+          <div class="ctrl-label">FUNDING MODEL</div>
           <div class="dial-wrapper" id="s0k2-dial"></div>
           <div class="ctrl-name" id="s0k2-name"></div>
           <div class="ctrl-desc" id="s0k2-desc"></div>
@@ -682,7 +682,7 @@ html, body {
       </div>
       <div class="slider-row">
         <div class="ctrl-panel slider-panel">
-          <div class="ctrl-label">ETHICAL FRAMEWORK</div>
+          <div class="ctrl-label">ETHICS</div>
           <div class="slider-wrap" id="s0sl-wrap"></div>
           <div class="ctrl-name" id="s0sl-name"></div>
           <div class="ctrl-desc" id="s0sl-desc"></div>
@@ -712,7 +712,7 @@ html, body {
       </div>
       <div class="slider-row">
         <div class="ctrl-panel slider-panel">
-          <div class="ctrl-label">DATA SOURCE</div>
+          <div class="ctrl-label">DATA SOURCING</div>
           <div class="slider-wrap" id="s1sl-wrap"></div>
           <div class="ctrl-name" id="s1sl-name"></div>
           <div class="ctrl-desc" id="s1sl-desc"></div>
@@ -734,7 +734,7 @@ html, body {
           <div class="ctrl-desc" id="s2k1-desc"></div>
         </div>
         <div class="ctrl-panel knob-panel">
-          <div class="ctrl-label">SYSTEM PROMPT</div>
+          <div class="ctrl-label">SYSTEM OVERSIGHT</div>
           <div class="dial-wrapper" id="s2k2-dial"></div>
           <div class="ctrl-name" id="s2k2-name"></div>
           <div class="ctrl-desc" id="s2k2-desc"></div>
@@ -742,7 +742,7 @@ html, body {
       </div>
       <div class="slider-row">
         <div class="ctrl-panel slider-panel">
-          <div class="ctrl-label">MODEL SIZE (Billions of Parameters)</div>
+          <div class="ctrl-label">MODEL SIZE</div>
           <div class="slider-wrap" id="s2sl-wrap"></div>
           <div class="ctrl-name" id="s2sl-name"></div>
           <div class="ctrl-desc" id="s2sl-desc"></div>
@@ -1171,69 +1171,67 @@ class HorizontalSlider {
 let CTRL = {
   // ── Screen 0: WHO ARE YOU? ──────────────────────────────────
 ORG_TYPE: {
-    names: ['Community group', 'Research institute', 'Public / governmental', 'Startup', 'Mega-corporation'],
+    names: ['Community group', 'Research institute', 'Public / governmental', 'Startup', 'Big corporation'],
     descs: [
-      'A grassroots organisation built around a specific community or cause. Decisions are shaped by the people it serves, not by investors or shareholders. Sustainable but small-scale, reliant on grants and goodwill.',
-      'A university lab or research body focused on advancing knowledge. Publishes findings openly and moves carefully, but can be slow and disconnected from real-world needs.',
-      'A publicly funded body accountable to citizens through democratic processes. Priorities can shift with elections and political pressure, but it has a long-term mandate to serve the public interest.',
-      'A young, fast-moving company backed by investors who expect rapid growth. Exciting and innovative, but under constant pressure to scale quickly and generate returns, often at the expense of caution.',
-      'A dominant technology platform with enormous resources, global reach, and existing infrastructure. Capable of deploying at massive scale, but with a track record of absorbing competitors and concentrating power.',
+      'A grassroots organisation built around a specific community or cause.',
+      'A research body or university lab focused on advancing knowledge.',
+      'A public body accountable to citizens.',
+      'A fast-moving company that expects rapid growth.',
+      'A big tech platform with enormous resources and global reach.',
     ],
   },
 
   ETHICAL: {
-    names: ['Justice and rights centred', 'Transparent and careful', 'Techno-optimist', 'Growth-first', 'Harm-tolerant', 'Fully extractive'],
+    names: ['Justice and rights centred', 'Transparent and careful', 'Techno-optimist', 'Growth-first', 'Harm-tolerant'],
     descs: [
-      'Every decision starts by asking who could be harmed and how to prevent it. Prioritises the rights of individuals and communities over speed or profit. The slowest approach, but the most accountable.',
-      'Design decisions are documented and reviewed before anything is released. Genuine effort to avoid causing harm, with processes in place to catch problems early. Slower to ship, but builds trust.',
-      'Believes technology is inherently a force for good and that problems can be solved by building more and better tools. Moves quickly and optimistically, sometimes without fully considering who might be left behind or hurt along the way.',
-      'Speed and market share come first. Ethical questions are dealt with after launch, usually only when something goes wrong publicly. Treats responsibility as a cost to be minimised.',
-      'Aware that the product may cause harm to some people or communities, but treats this as an acceptable trade-off for growth or profit. Problems are only addressed when they become a legal or reputational threat.',
-      'People, communities, and their data are treated purely as resources to be used. No meaningful ethical consideration at any stage. The goal is maximum extraction of value, disguised behind polished branding.',
+      'Fully prioritises the rights of individuals and communities over profit.',
+      'Decisions are made carefully, openly and are reviewed by stakeholders.',
+      'Believes technology is inherently good and that most problems will be solved by building more and better tools.',
+      'Ethical questions are only dealt with when something goes wrong publicly.',
+      'Problems are only addressed when they become a legal or reputational threat.',
     ],
   },
 
   FUNDING: {
-    names: ['Government grants', 'Subscription based', 'Pay-per-use', 'Big loan', 'Rich sponsor'],
+    names: ['Government grants', 'Subscription based', 'Pay-per-use', 'Big loan', 'Rich investors'],
     descs: [
-      'Funded by public money through government bodies or research councils. Comes with transparency requirements and accountability, but priorities can change when the political landscape shifts.',
-      'Users pay a regular fee to access the service. Sustainable if the product genuinely helps people, but risks locking out anyone who cannot afford to pay.',
-      'Users are charged each time they use the service. Keeps the barrier to entry low, but creates pressure to maximise the number of transactions, which can conflict with user wellbeing.',
-      'Funded by borrowing a large amount of money that must be repaid with interest. Creates intense pressure to grow fast and generate revenue, often pushing the company toward short-term thinking.',
-      'Funded by a single wealthy individual or corporation. Can provide stability and freedom from market pressure, but the sponsor\'s personal values and interests inevitably shape the direction of the project.',
+      'Funded by public money through government bodies or research councils.',
+      'Users pay a regular fee to access the service. ',
+      'Users are charged each time they use the service.',
+      'Funded by borrowing a large amount of money that must be repaid with interest.',
+      'Funded by wealthy individuals or corporations with power over organisational decisions.',
     ],
   },
 
   DATA_TYPES: {
     names: ['Web archives', 'Books and literature', 'Academic papers', 'Client / task specific', 'Social media'],
     descs: [
-      'Text collected from across the internet, including news sites, blogs, forums, and wikis. Covers an enormous range of topics, but reflects whatever biases, misinformation, and power imbalances exist online.',
-      'Published novels, non-fiction, journalism, and other written works. Generally well-written and edited, but overwhelmingly represents the voices of those who get published, which skews towards certain cultures and languages.',
-      'Peer-reviewed research papers, theses, and scientific literature. High-quality and evidence-based, but written in specialist language and concentrated in well-funded research institutions.',
-      'Data generated specifically for or by the organisation\'s own users and tasks. Highly relevant to the job at hand, but raises serious questions about consent and whether people knew their data would be used this way.',
-      'Posts, comments, videos, and conversations from platforms like Twitter, TikTok, Reddit, and YouTube. Rich in everyday language and current opinions, but heavily shaped by platform algorithms and full of toxicity and misinformation.',
+      'Text collected from across the internet, including news sites, blogs, forums, and wikis.',
+      'Published novels, non-fiction, journalism, and other written works. Generally well-written and edited, but less diversity than other options.',
+      'Peer-reviewed research papers, theses, and scientific literature. ',
+      'Data generated specifically with or extracted from the organisation\'s own users and tasks.',
+      'Posts, comments, videos, and conversations from platforms like Twitter, TikTok, Reddit, and Facebook.',
     ],
   },
 
   DATA_SOURCE: {
     names: ['Built / collected in-house', 'Licensed / purchased', 'Crowdsourced', 'Open datasets', 'Synthetic', 'Scraped'],
     descs: [
-      'The organisation creates or gathers its own data directly, with full control over quality and consent. Slow and expensive, but the most transparent and accountable approach.',
-      'Data bought or formally licensed from whoever owns it. Legally clear, but expensive and still may not involve meaningful consent from the people the data is actually about.',
-      'Gathered from paid workers or volunteers who contribute data knowingly. Can be diverse and flexible, but the quality depends on how well the task is designed and whether contributors are fairly compensated.',
-      'Publicly available datasets released under open licences by researchers or institutions. Anyone can inspect and reproduce the work, but these datasets are often limited in scope and can become outdated.',
-      'Artificial data generated by other AI models or simulations. No privacy risk to real people, but if the AI that made it had biases, those biases get baked in and can compound over time.',
-      'Collected by automated tools that crawl websites and download content without asking permission. Fast and cheap, but legally contested and ethically questionable, since the people who created the content had no say.',
+      'The organisation creates or gathers its own data directly, with full control over quality and consent.',
+      'Data bought or formally licensed from whoever owns it.',
+      'Gathered from paid workers or volunteers who contribute data knowingly.',
+      'Publicly available datasets released under open licences by researchers or institutions.',
+      'Artificial data generated by other AI models or simulations.',
+      'Collected by automated tools that crawl websites and download content without asking permission.',
     ],
   },
 
   DATA_USE: {
-    names: ['Unsupervised', 'Human feedback', 'Rule-based', 'Fine-tuned'],
+    names: ['Unsupervised training', 'Human guidance', 'Focused training'],
     descs: [
-      'The model teaches itself by finding patterns in raw data with no human guidance. Cheap and scalable, but unpredictable. The model decides for itself what matters, and nobody fully knows what it has learned.',
-      'People review and score the model\'s outputs, and those scores are used to steer its behaviour. Produces more human-aligned results, but is expensive and shaped by who the reviewers are and what they believe is correct.',
-      'The model is given explicit rules or principles it must follow. Predictable and easy to audit, but rigid. It can struggle with situations the rules did not anticipate.',
-      'A general-purpose model is retrained on a smaller, carefully chosen dataset for a specific job. Very capable within its narrow area, but can break in unexpected ways outside it.',
+      'The model finds patterns in the data without guidance. Cheaper, but might lack accuracy.',
+      'People review the model and reward it for better actions to steer its behaviour. Generally a more expensive option.',
+      'Uses more task-specific data to make the model more effective in narrow situations, but less flexible.',
     ],
   },
 
@@ -1241,29 +1239,29 @@ ORG_TYPE: {
     names: ['Runs on devices locally', 'Hosted by the organisation', 'Decentralised', 'Outsourced to a tech giant'],
     descs: [
       'The model runs on the user\'s own phone, laptop, or local hardware. Maximum privacy because data never leaves the device, but only small models can run this way and performance depends on the user\'s hardware.',
-      'The organisation runs the model on its own servers and hardware. Full control over the data and no dependency on outside companies, but requires significant upfront investment and ongoing maintenance.',
-      'The model is spread across many independent computers run by different people or groups. No single point of control or failure, but coordination is difficult and output quality can be inconsistent.',
-      'The model is accessed through a big tech company\'s cloud service like Amazon, Google, or Microsoft. Easy to scale and maintain, but the organisation\'s data passes through someone else\'s infrastructure and is subject to their terms.',
+      'The organisation runs the model on its own servers and hardware.',
+      'The model is spread across many independent computers run by different people or groups.',
+      'The model is accessed through a big tech company\'s services e.g. OpenAI, Google, or Microsoft.',
     ],
   },
 
   MODEL_SIZE: {
     names: ['1B', '7B', '14B', '80B', '140B'],
     descs: [
-      'A very small model that can run on an ordinary laptop without a graphics card. Responds almost instantly and uses minimal energy. Good for simple, repetitive tasks but struggles with anything complex or open-ended.',
-      'A mid-size model that needs a decent graphics card to run (the kind found in a gaming PC). Capable enough for most focused tasks like summarising, translating, or answering questions within a specific topic.',
-      'A larger model that needs a powerful graphics card or a small server. Noticeably better at reasoning and handling nuance, but the energy cost starts to add up and it is beyond what most individuals can run.',
-      'A large model that requires dedicated server hardware, typically only available to well-funded organisations. Strong at complex reasoning and creative tasks. Significant energy and cooling costs.',
-      'A frontier-scale model that needs multiple high-end servers working together. Near the cutting edge of what AI can do, but with substantial energy consumption and costs that put it out of reach for all but the largest companies.',
+      'Tiny and fast; can only be used for very basic tasks.',
+      'Works reasonably well for simple tasks like summarising.',
+      'Can perform more complex functions like basic reasoning.',
+      'Can do complex tasks like coding.',
+      'The most powerful models in the world. Can tackle difficult problems like building a whole website from scratch.',
     ],
   },
 
   SYSTEM_PROMPT: {
-    names: ['Safety first', 'Balanced', 'User configurable'],
+    names: ['Safety first', 'Some oversight', 'User configurable'],
     descs: [
-      'The model is instructed to be cautious above all else. It will refuse requests it considers risky and err on the side of saying no. Safest for the organisation, but can feel restrictive and may refuse to help with perfectly reasonable tasks.',
-      'A middle ground between safety and usefulness. The model has guardrails for clearly harmful requests but tries to be as helpful as possible within those limits. Most users will find this strikes a reasonable balance.',
-      'Users can set their own rules for how the model behaves. Maximum freedom and flexibility, but some users may remove safety measures entirely, and the organisation has less control over how the model is used.',
+      'The model is instructed to be cautious above all else. It will refuse requests it considers risky but may refuse to help with reasonable tasks.',
+      'The model has guardrails for clearly harmful requests but tries to be as helpful as possible within those limits.',
+      'Users have full agency to set their own rules for how the model behaves, (including removing safety measures).',
     ],
   },
 };
@@ -1301,6 +1299,7 @@ const state = {
 };
 
 const screenInited = new Set();
+const screenControls = new Map();
 const DEBUG_OVERLAY_ENABLED = false;
 
 /* ============================================================
@@ -1411,6 +1410,11 @@ function initScreen0() {
     },
   });
   state.activeSlider._snapTo(state.ethicalIdx);
+  screenControls.set(0, {
+    knob1: state.activeKnob1,
+    knob2: state.activeKnob2,
+    slider: state.activeSlider,
+  });
 }
 
 function initScreen1() {
@@ -1456,6 +1460,11 @@ function initScreen1() {
     },
   });
   state.activeSlider._snapTo(state.dataSourceIdx);
+  screenControls.set(1, {
+    knob1: state.activeKnob1,
+    knob2: state.activeKnob2,
+    slider: state.activeSlider,
+  });
 }
 
 function initScreen2() {
@@ -1502,6 +1511,11 @@ function initScreen2() {
     },
   });
   state.activeSlider._snapTo(state.modelSizeIdx);
+  screenControls.set(2, {
+    knob1: state.activeKnob1,
+    knob2: state.activeKnob2,
+    slider: state.activeSlider,
+  });
 }
 
 /* ============================================================
@@ -1536,6 +1550,7 @@ function showScreen(n) {
   _lastK1Raw  = -1;
   _lastK2Raw  = -1;
   _lastSlRaw  = -1;
+  _pollNeedsBaseline = true;
 
   // Lazy init
   if (n < 3 && !screenInited.has(n)) {
@@ -1544,6 +1559,11 @@ function showScreen(n) {
     else if (n === 1) initScreen1();
     else if (n === 2) initScreen2();
   }
+
+  const controls = screenControls.get(n);
+  state.activeKnob1 = controls ? controls.knob1 : null;
+  state.activeKnob2 = controls ? controls.knob2 : null;
+  state.activeSlider = controls ? controls.slider : null;
 }
 
 function goBackOneScreen() {
@@ -2069,6 +2089,7 @@ function startOver() {
     activeKnob1: null, activeKnob2: null, activeSlider: null,
   });
   screenInited.clear();
+  screenControls.clear();
 
   // Clear all dial/slider containers
   ['s0k1-dial','s0k2-dial','s1k1-dial','s1k2-dial','s2k1-dial','s2k2-dial'].forEach(id => {
@@ -2098,6 +2119,7 @@ function startOver() {
 let _knobTimer = null;
 let _lastK1Idx = -1, _lastK2Idx = -1, _lastSlIdx = -1;
 let _lastK1Raw = -1, _lastK2Raw = -1, _lastSlRaw = -1;
+let _pollNeedsBaseline = true;
 let _lastBtnBack = 0, _lastBtnNext = 0, _lastBtnReset = 0;
 let _lastNavButtonFireMs = 0;
 const DEADBAND = 12;
@@ -2270,6 +2292,19 @@ function startKnobPoll() {
 
       // UI control updates — skip on receipt screen
       if (state.screen === 3) return;
+
+      // Establish the physical baseline after navigation without overwriting
+      // choices that were made before returning to this screen.
+      if (_pollNeedsBaseline) {
+        _lastK1Raw = knob;
+        _lastK2Raw = knob2;
+        _lastSlRaw = slider;
+        _lastK1Idx = state.activeKnob1 ? state.activeKnob1.getCurrentIndex() : -1;
+        _lastK2Idx = state.activeKnob2 ? state.activeKnob2.getCurrentIndex() : -1;
+        _lastSlIdx = state.activeSlider ? state.activeSlider.getCurrentIndex() : -1;
+        _pollNeedsBaseline = false;
+        return;
+      }
 
       // Knob 1 → activeKnob1 (inverted)
       if (state.activeKnob1 && (_lastK1Raw === -1 || Math.abs(knob - _lastK1Raw) >= DEADBAND)) {
