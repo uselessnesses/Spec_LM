@@ -295,7 +295,6 @@ ENV_BASE = {
     "model_location": {
         "Runs on devices locally": 1,
         "Hosted by the organisation": 0,
-        "Decentralised": 0,
         "Outsourced to a tech giant": -1,
         "Outsourced to third party": -1,
     },
@@ -321,11 +320,6 @@ ENV_COMBOS = [
         "reason": "A 140B model hosted by the organisation still needs a lot of server power every day.",
     },
     {
-        "conditions": {"model_size": "140B", "model_location": "Decentralised"},
-        "modifier": -3,
-        "reason": "A decentralised 140B setup repeats heavy compute across many machines, so total energy use becomes very high.",
-    },
-    {
         "conditions": {"model_size": "1B", "model_location": "Runs on devices locally"},
         "modifier": 2,
         "reason": "A small model running on local devices usually has a very low energy cost.",
@@ -349,16 +343,6 @@ ENV_COMBOS = [
         "conditions": {"model_size": "14B", "model_location": "Hosted by the organisation"},
         "modifier": 1,
         "reason": "A 14B model hosted by the organisation can be scheduled and managed to use power more efficiently.",
-    },
-    {
-        "conditions": {"model_size": "7B", "model_location": "Decentralised"},
-        "modifier": 1,
-        "reason": "A decentralised 7B model can share work across many devices, which can reduce pressure on big data centres.",
-    },
-    {
-        "conditions": {"model_size": "14B", "model_location": "Decentralised"},
-        "modifier": 1,
-        "reason": "A decentralised 14B setup can make better use of existing hardware when the work is shared well.",
     },
     {
         "conditions": {"ethical": "Justice and rights centred", "model_size": "1B"},
@@ -585,31 +569,6 @@ PRACTICALITY_COMBOS = [
         "conditions": {"model_size": "140B", "model_location": "Hosted by the organisation"},
         "modifier": -6,
         "reason": "A 140B model hosted in-house requires very large infrastructure and specialist staff.",
-    },
-    {
-        "conditions": {"model_size": "140B", "model_location": "Decentralised"},
-        "modifier": -6,
-        "reason": "Coordinating a frontier-scale model across decentralised nodes is an unsolved engineering problem.",
-    },
-    {
-        "conditions": {"model_size": "80B", "model_location": "Decentralised"},
-        "modifier": -5,
-        "reason": "An 80B model is very hard to run in a decentralised way because each node needs heavy compute.",
-    },
-    {
-        "conditions": {"model_size": "14B", "model_location": "Decentralised"},
-        "modifier": -2,
-        "reason": "A decentralised 14B model is possible but difficult to run reliably across mixed hardware.",
-    },
-    {
-        "conditions": {"model_size": "7B", "model_location": "Decentralised"},
-        "modifier": -1,
-        "reason": "Decentralising a 7B model can work, but coordination overhead often slows delivery.",
-    },
-    {
-        "conditions": {"model_size": "1B", "model_location": "Decentralised"},
-        "modifier": -2,
-        "reason": "A decentralised setup for a 1B model adds complexity for little practical gain.",
     },
     {
         "conditions": {"model_size": "1B", "model_location": "Outsourced to a tech giant"},

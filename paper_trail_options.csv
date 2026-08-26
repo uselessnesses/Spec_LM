@@ -30,8 +30,7 @@ screen,control_key,control_id,control_name,option_index,option_label,option_desc
 2,DATA_USE,s2_knob2,TRAINING TYPE,2,Focused training,"Uses more task-specific data to make the model more effective in narrow situations, but less flexible.",6,6,8
 3,MODEL_LOCATION,s3_knob1,MODEL LOCATION,0,Runs on devices locally,"The model runs on the user's own phone, laptop, or local hardware. Maximum privacy because data never leaves the device, but only small models can run this way and performance depends on the user's hardware.",10,8,6
 3,MODEL_LOCATION,s3_knob1,MODEL LOCATION,1,Hosted by the organisation,The organisation runs the model on its own servers and hardware.,8,7,5
-3,MODEL_LOCATION,s3_knob1,MODEL LOCATION,2,Decentralised,The model is spread across many independent computers run by different people or groups.,7,9,6
-3,MODEL_LOCATION,s3_knob1,MODEL LOCATION,3,Outsourced to a tech giant,"The model is accessed through a big tech company's services e.g. OpenAI, Google, or Microsoft.",1,1,8
+3,MODEL_LOCATION,s3_knob1,MODEL LOCATION,2,Outsourced to a tech giant,"The model is accessed through a big tech company's services e.g. OpenAI, Google, or Microsoft.",1,1,8
 3,MODEL_SIZE,s3_slider,MODEL SIZE,0,1B,Tiny and fast; can only be used for very basic tasks.,10,8,6
 3,MODEL_SIZE,s3_slider,MODEL SIZE,1,7B,Works reasonably well for simple tasks like summarising.,8,6,8
 3,MODEL_SIZE,s3_slider,MODEL SIZE,2,14B,Can perform more complex functions like basic reasoning.,7,7,7

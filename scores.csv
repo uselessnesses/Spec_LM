@@ -32,8 +32,7 @@ s2_knob2,2,Rule-based,7,7,7
 s2_knob2,3,Fine-tuned,6,6,8
 s3_knob1,0,Runs on devices locally,8,8,6
 s3_knob1,1,Hosted by the organisation,6,7,5
-s3_knob1,2,Decentralised,7,7,4
-s3_knob1,3,Outsourced to third party,4,5,8
+s3_knob1,2,Outsourced to third party,4,5,8
 s3_slider,0,1B,10,4,9
 s3_slider,1,7B,8,6,8
 s3_slider,2,14B,6,7,6
